@@ -1,0 +1,1549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TicketTown · Movie tickets, seats and showtimes</title>
+<meta name="description" content="TicketTown - pick a movie, grab your seats, or just ask the AI assistant to book for you.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+<!-- ═════════════════════════════════ STYLES ═════════════════════════════════ -->
+<style>
+:root {
+  --bg: #f2f2f2;
+  --surface: #ffffff;
+  --nav: #333545;
+  --ink: #1f2533;
+  --muted: #6b7080;
+  --line: #e4e4e9;
+  --accent: #f84464;
+  --accent-dark: #dc2a4b;
+  --accent-soft: #fde8ec;
+  --green: #1ea83c;
+  --green-soft: #e8f6ea;
+  --amber: #f5a623;
+  --red: #d8334f;
+  --dark: #1a1a1a;
+  --radius: 10px;
+  --shadow: 0 2px 12px rgba(20, 24, 40, .08);
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Outfit', 'Inter', system-ui, sans-serif;
+  --seat: 32px;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14.5px; line-height: 1.5; padding-bottom: env(safe-area-inset-bottom); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+h1, h2, h3 { font-family: var(--display); margin: 0; line-height: 1.2; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+
+/* ── header ── */
+.top { position: sticky; top: 0; z-index: 40; background: var(--surface); box-shadow: 0 1px 0 var(--line); }
+.top-row { display: flex; align-items: center; gap: 22px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 800; font-size: 24px; letter-spacing: -.02em; flex: none; }
+.brand svg { width: 38px; height: 38px; }
+.brand .town { color: var(--accent); }
+.search { position: relative; flex: 1; max-width: 620px; }
+.search input { width: 100%; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: #f7f7f9; padding: 0 14px 0 40px; font: inherit; color: var(--ink); }
+.search input:focus { outline: none; border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }
+.search .mag { position: absolute; left: 13px; top: 11px; width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
+.search-results { position: absolute; top: 46px; left: 0; right: 0; background: #fff; border-radius: 10px; box-shadow: 0 10px 40px rgba(0, 0, 0, .18); border: 1px solid var(--line); overflow: hidden; z-index: 50; }
+.sr { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 14px; background: none; border: 0; border-bottom: 1px solid var(--line); }
+.sr:last-child { border: 0; }
+.sr:hover, .sr.on { background: #f7f7f9; }
+.sr .poster { width: 34px; border-radius: 4px; flex: none; box-shadow: none; }
+.sr .poster .strip, .sr .poster .poster-title { display: none; }
+.sr .poster .poster-emoji { font-size: 16px; top: 22%; }
+.sr b { display: block; }
+.sr small { color: var(--muted); }
+.sr-empty { padding: 18px; color: var(--muted); text-align: center; }
+.city { color: var(--muted); font-size: 13px; white-space: nowrap; display: flex; gap: 4px; align-items: center; }
+.spacer { flex: 1; }
+.pill-btn { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: #f7f7f9; border: 1px solid var(--line); font-weight: 500; font-size: 13px; }
+.pill-btn:hover { border-color: #c9c9d1; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+.live-on .dot { background: var(--green); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(30, 168, 60, .55); } 70% { box-shadow: 0 0 0 8px rgba(30, 168, 60, 0); } 100% { box-shadow: 0 0 0 0 rgba(30, 168, 60, 0); } }
+.badge-count { background: var(--accent); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 0 7px; }
+.icon-btn { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #f7f7f9; border: 1px solid var(--line); font-size: 15px; }
+.subnav { background: var(--nav); }
+.subnav .wrap { display: flex; gap: 6px; height: 40px; align-items: center; }
+.subnav a { color: #d3d5df; padding: 10px 12px; font-size: 13.5px; font-weight: 500; }
+.subnav a:hover, .subnav a.active { color: #fff; }
+.subnav a.active { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* ── generic ── */
+main { min-height: 70vh; padding-bottom: 80px; }
+.pad { padding-top: 26px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 8px; padding: 12px 24px; font-weight: 600; background: var(--accent); color: #fff; transition: background .12s, transform .12s; }
+.btn:hover { background: var(--accent-dark); }
+.btn:disabled { background: #d4d5db; cursor: not-allowed; }
+.btn.ghost { background: #fff; color: var(--accent); border: 1px solid var(--accent); }
+.btn.ghost:hover { background: var(--accent-soft); }
+.btn.light { background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .5); color: #fff; }
+.btn.light:hover { background: rgba(255, 255, 255, .25); }
+.btn.danger { background: #fff; color: var(--red); border: 1px solid #f0b7c0; }
+.btn.block { width: 100%; }
+.card { background: var(--surface); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); }
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 500; margin-bottom: 14px; }
+.back:hover { color: var(--ink); }
+.chip { padding: 6px 14px; border-radius: 999px; background: #fff; border: 1px solid #d5d6dd; color: #4a4f5e; font-size: 13px; font-weight: 500; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.tag { display: inline-block; padding: 2px 10px; border-radius: 4px; background: #eeeef2; font-size: 12.5px; color: #4a4f5e; font-weight: 500; }
+.pill { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill.ok { background: var(--green-soft); color: var(--green); }
+.pill.warn { background: #fff4de; color: #b87503; }
+.pill.bad { background: var(--accent-soft); color: var(--red); }
+.pill.dim { background: #eeeef2; color: var(--muted); }
+.spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255, 255, 255, .45); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.center { text-align: center; padding: 70px 0; }
+.center .spinner { width: 34px; height: 34px; margin: 0 auto 14px; display: block; border-color: #ddd; border-top-color: var(--accent); }
+.err-box { background: var(--accent-soft); border: 1px solid #f5b8c3; color: #a01c37; border-radius: 8px; padding: 11px 14px; margin: 12px 0; }
+.hint { font-size: 13px; color: var(--muted); }
+.sec-title { font-size: 22px; font-weight: 700; margin: 0 0 14px; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; margin: 34px 0 14px; gap: 12px; }
+.sec-head h2 { font-size: 22px; }
+.see-all { color: var(--accent); font-weight: 600; font-size: 13.5px; background: none; border: 0; }
+
+/* ── posters ── */
+.poster { position: relative; aspect-ratio: 2 / 3; border-radius: var(--radius); overflow: hidden; background: linear-gradient(160deg, var(--c1), var(--c2)); display: flex; flex-direction: column; justify-content: flex-end; isolation: isolate; box-shadow: 0 4px 14px rgba(0, 0, 0, .16); }
+.poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; }
+.poster-emoji { position: absolute; top: 17%; left: 50%; transform: translateX(-50%); font-size: 62px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .35)); }
+.poster-title { color: #fff; font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1.1; padding: 0 12px 6px; text-shadow: 0 2px 8px rgba(0, 0, 0, .5); }
+.poster.has-img .poster-emoji, .poster.has-img .poster-title { display: none; }
+.strip { background: linear-gradient(transparent, rgba(0, 0, 0, .88)); color: #fff; display: flex; justify-content: space-between; gap: 6px; padding: 26px 11px 9px; font-size: 12px; font-weight: 600; }
+.strip .star { color: #ffd14a; }
+.poster.sm { width: 70px; flex: none; border-radius: 8px; }
+.poster.sm .strip, .poster.sm .poster-title { display: none; }
+.poster.sm .poster-emoji { font-size: 28px; top: 20%; }
+
+/* ── hero carousel ── */
+.hero { position: relative; margin-top: 18px; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); background: #222; }
+.slides { position: relative; height: 340px; }
+.slide { position: absolute; inset: 0; opacity: 0; transition: opacity .6s ease; cursor: pointer; background-size: cover; background-position: center 25%; display: flex; align-items: flex-end; pointer-events: none; }
+.slide.on { opacity: 1; pointer-events: auto; }
+.slide::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10, 10, 20, .85) 0%, rgba(10, 10, 20, .35) 55%, rgba(10, 10, 20, 0) 100%), linear-gradient(0deg, rgba(10, 10, 20, .7), transparent 50%); }
+.slide-body { position: relative; z-index: 1; color: #fff; padding: 32px 40px; max-width: 620px; }
+.slide-body .tag { background: var(--accent); color: #fff; margin-bottom: 10px; }
+.slide-body h2 { font-size: clamp(26px, 4vw, 42px); font-weight: 800; }
+.slide-body p { margin: 8px 0 16px; color: #e3e3ea; }
+.hero-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 38px; height: 60px; border: 0; background: rgba(0, 0, 0, .4); color: #fff; font-size: 22px; z-index: 3; }
+.hero-arrow:hover { background: rgba(0, 0, 0, .65); }
+.hero-arrow.prev { left: 0; border-radius: 0 8px 8px 0; }
+.hero-arrow.next { right: 0; border-radius: 8px 0 0 8px; }
+.dots { position: absolute; bottom: 12px; right: 20px; display: flex; gap: 6px; z-index: 3; }
+.dots button { width: 8px; height: 8px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .5); padding: 0; }
+.dots button.on { background: #fff; width: 22px; border-radius: 8px; }
+.agent-hint { margin-top: 16px; display: flex; gap: 10px; align-items: center; padding: 10px 16px; border-radius: 10px; background: #efeaff; border: 1px solid #d6c9ff; color: #3b2a83; }
+
+/* ── movie rails / grid ── */
+.rail-wrap { position: relative; }
+.rail { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x proximity; padding: 4px 2px 12px; scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.rail .movie-card { flex: 0 0 200px; scroll-snap-align: start; }
+.rail-btn { position: absolute; top: 38%; z-index: 2; width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .65); color: #fff; font-size: 20px; }
+.rail-btn.l { left: -14px; } .rail-btn.r { right: -14px; }
+.movie-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 22px; }
+.movie-card { display: block; text-align: left; background: none; border: 0; padding: 0; transition: transform .15s; }
+.movie-card:hover { transform: translateY(-4px); }
+.movie-card h3 { font-family: var(--font); font-size: 16px; font-weight: 600; margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.movie-card .sub { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filters { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.filter-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.filter-row > b { width: 82px; font-size: 13px; color: var(--muted); font-weight: 600; }
+
+/* ── movie detail ── */
+.mhero { background: var(--dark) var(--bd, none) right top / cover no-repeat; position: relative; color: #fff; }
+.mhero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #1a1a1a 22%, rgba(26, 26, 26, .82) 48%, rgba(26, 26, 26, .25) 100%); }
+.mhero.nobd { background: linear-gradient(120deg, var(--c1), var(--c2)); }
+.mhero.nobd::before { background: rgba(0, 0, 0, .45); }
+.mhero-in { position: relative; display: grid; grid-template-columns: 250px 1fr; gap: 34px; padding-top: 34px; padding-bottom: 34px; align-items: center; }
+.mposter { position: relative; }
+.mposter .poster { box-shadow: 0 8px 30px rgba(0, 0, 0, .5); }
+.mposter .strip { padding-top: 10px; }
+.mposter .in-cinemas { position: absolute; left: 0; right: 0; bottom: 0; background: #16161f; text-align: center; padding: 7px; font-size: 12px; font-weight: 600; border-radius: 0 0 10px 10px; z-index: 2; }
+.minfo h1 { font-size: clamp(28px, 4.2vw, 44px); font-weight: 800; }
+.tagline { color: #c9cad6; font-style: italic; margin: 6px 0 0; }
+.score-pill { display: inline-flex; align-items: center; gap: 10px; margin: 16px 0 6px; padding: 10px 16px; border-radius: 8px; background: rgba(255, 255, 255, .13); backdrop-filter: blur(4px); font-weight: 700; font-size: 17px; }
+.score-pill small { font-weight: 500; color: #d6d7e0; font-size: 13px; }
+.score-pill .star { color: #ffd14a; }
+.fmts { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+.fmts span { background: #fff; color: var(--ink); border-radius: 4px; padding: 3px 10px; font-size: 12.5px; font-weight: 600; }
+.meta-line { color: #e1e2ea; margin-bottom: 20px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.about { background: #fff; padding: 30px 0 34px; }
+.about p { max-width: 900px; margin: 0 0 6px; font-size: 15.5px; line-height: 1.65; }
+.cast { display: flex; gap: 22px; overflow-x: auto; padding: 6px 2px 10px; scrollbar-width: thin; }
+.cast-item { flex: 0 0 96px; text-align: center; }
+.cast-item .ph { width: 88px; height: 88px; border-radius: 50%; margin: 0 auto 8px; background: #e6e6ec; overflow: hidden; display: grid; place-items: center; font-weight: 700; color: #8a8fa0; font-size: 26px; position: relative; }
+.cast-item .ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cast-item b { display: block; font-size: 13px; line-height: 1.25; }
+.cast-item small { color: var(--muted); font-size: 12px; display: block; line-height: 1.25; }
+
+/* ── showtimes ── */
+.bk-head { background: #fff; padding: 18px 0 14px; border-bottom: 1px solid var(--line); }
+.bk-head h1 { font-size: 26px; font-weight: 700; }
+.bk-head .tags { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.datebar { background: #fff; border-bottom: 1px solid var(--line); }
+.dates { display: flex; gap: 8px; overflow-x: auto; padding-top: 10px; padding-bottom: 10px; }
+.date-tab { flex: none; width: 62px; padding: 6px 0; border-radius: 8px; background: none; border: 0; text-align: center; color: #4a4f5e; }
+.date-tab .d1 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+.date-tab .d2 { font-size: 20px; font-weight: 700; line-height: 1.1; }
+.date-tab .d3 { font-size: 11.5px; text-transform: uppercase; }
+.date-tab:hover { background: #f4f4f7; }
+.date-tab.on { background: var(--accent); color: #fff; }
+.filterbar { background: #fff; border-bottom: 1px solid var(--line); }
+.filterbar .wrap { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding-top: 10px; padding-bottom: 10px; flex-wrap: wrap; }
+.legend-inline { display: flex; gap: 16px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+.legend-inline i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.theatre { display: grid; grid-template-columns: 300px 1fr; gap: 18px; padding: 20px 24px; background: #fff; border-bottom: 1px solid var(--line); }
+.theatre:first-child { border-radius: 10px 10px 0 0; }
+.theatre:last-child { border-radius: 0 0 10px 10px; border: 0; }
+.theatre:only-child { border-radius: 10px; }
+.theatre h3 { font-family: var(--font); font-size: 15.5px; font-weight: 600; }
+.slots { display: flex; gap: 14px; flex-wrap: wrap; }
+.tp { min-width: 104px; padding: 8px 12px; border-radius: 6px; background: #fff; border: 1px solid #c9d8cd; text-align: center; transition: box-shadow .12s, transform .12s; }
+.tp b { display: block; font-size: 14px; font-weight: 600; }
+.tp small { display: block; font-size: 11px; color: var(--muted); }
+.tp.ok { border-color: var(--green); } .tp.ok b { color: var(--green); }
+.tp.fast { border-color: var(--amber); } .tp.fast b { color: #c78100; }
+.tp.sold { border-color: #ddd; cursor: not-allowed; } .tp.sold b { color: #b2b4bd; }
+.tp:hover:not(:disabled) { box-shadow: 0 4px 14px rgba(0, 0, 0, .12); transform: translateY(-2px); }
+
+/* ── steps ── */
+.steps { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.step { display: flex; align-items: center; gap: 8px; }
+.step i { font-style: normal; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #e4e4e9; font-weight: 700; font-size: 12px; color: #6b7080; }
+.step.done i, .step.now i { background: var(--accent); color: #fff; }
+.step.now { color: var(--ink); font-weight: 600; }
+.step-sep { width: 22px; height: 1px; background: #d0d1d8; }
+
+/* ── seats ── */
+.seat-top { background: #fff; border-bottom: 1px solid var(--line); }
+.seat-top .wrap { display: flex; align-items: center; gap: 16px; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; }
+.seat-top .ttl { flex: 1; min-width: 220px; }
+.seat-top .ttl b { font-size: 18px; display: block; }
+.seat-top .ttl small { color: var(--muted); }
+.seat-top .quick { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.seat-card { max-width: 860px; margin: 22px auto 0; overflow-x: auto; padding: 26px 20px 30px; }
+.tier { margin-bottom: 22px; }
+.tier-h { font-size: 12.5px; font-weight: 600; color: #4a4f5e; letter-spacing: .04em; border-bottom: 1px solid var(--line); padding-bottom: 6px; margin: 0 auto 12px; width: max-content; min-width: 100%; text-align: center; }
+.tier-h b { color: var(--ink); }
+.seatmap { display: flex; flex-direction: column; gap: 8px; align-items: center; min-width: max-content; margin: 0 auto; }
+.seat-row { display: flex; gap: 6px; align-items: center; }
+.row-label { width: 22px; text-align: center; font-size: 12px; color: var(--muted); font-weight: 600; }
+.aisle { width: 26px; }
+.seat { width: var(--seat); height: var(--seat); border-radius: 5px; background: #fff; border: 1px solid var(--green); font-size: 11px; font-weight: 500; color: var(--green); padding: 0; transition: background .1s, transform .1s; }
+.seat:hover:not(:disabled) { background: var(--green-soft); transform: scale(1.08); }
+.seat.selected { background: var(--green); color: #fff; }
+.seat.booked { background: #e9e9ee; border-color: #e9e9ee; color: #b9bbc6; cursor: not-allowed; }
+.seat.held { background: repeating-linear-gradient(45deg, #ffeec8 0 4px, #fff8e6 4px 8px); border-color: var(--amber); color: #b87503; cursor: not-allowed; }
+.seat.flash { animation: flash 1.4s ease-out; }
+@keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(248, 68, 100, .9); transform: scale(1.6); } 60% { box-shadow: 0 0 0 12px rgba(248, 68, 100, 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(248, 68, 100, 0); } }
+.screen { margin: 26px auto 6px; width: min(70%, 460px); height: 34px; border-top: 4px solid #b9bbc6; border-radius: 50% 50% 0 0 / 100% 100% 0 0; background: linear-gradient(#ececf1, transparent); opacity: .9; }
+.screen-label { text-align: center; font-size: 11.5px; letter-spacing: .25em; color: var(--muted); text-transform: uppercase; }
+.legend { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; margin-top: 22px; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend .seat { width: 18px; height: 18px; pointer-events: none; }
+.paybar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; background: #fff; box-shadow: 0 -4px 20px rgba(0, 0, 0, .12); transform: translateY(110%); transition: transform .25s ease; }
+.paybar.show { transform: none; }
+.paybar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.paybar b { font-size: 16px; }
+.paybar small { display: block; color: var(--muted); }
+.paybar .btn { min-width: 190px; font-size: 16px; }
+
+/* ── forms / checkout ── */
+.narrow { max-width: 1000px; margin: 0 auto; }
+.two-col { display: grid; grid-template-columns: 1fr 360px; gap: 22px; align-items: start; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.field label small { color: var(--muted); font-weight: 400; }
+.input { width: 100%; background: #fff; border: 1px solid #cfd0d8; border-radius: 8px; padding: 11px 13px; color: var(--ink); font: inherit; }
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input.bad { border-color: var(--red); }
+.field-err { color: var(--red); font-size: 12.5px; margin-top: 4px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+.tab { flex: 1; padding: 11px; border-radius: 8px; background: #fff; border: 1px solid #cfd0d8; font-weight: 600; text-align: center; }
+.tab.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-dark); }
+.order h3 { margin-bottom: 10px; font-size: 18px; }
+.order .line { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; color: var(--muted); }
+.order .line b { color: var(--ink); text-align: right; font-weight: 600; }
+.order .total { border-top: 1px dashed #cfd0d8; margin-top: 8px; padding-top: 14px; }
+.order .total b { font-size: 20px; }
+.timer { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; border-radius: 8px; background: #fff4de; border: 1px solid #f6d99a; color: #8a5a00; font-weight: 600; margin-bottom: 16px; }
+.timer b { font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.secure { display: flex; gap: 8px; align-items: center; justify-content: center; font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+.demo-banner { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 14px; border-radius: 8px; background: #efeaff; border: 1px dashed #b7a3f5; font-size: 13px; margin-bottom: 18px; color: #3b2a83; }
+
+/* ── ticket ── */
+.ticket { display: grid; grid-template-columns: 1fr 250px; background: #fff; border-radius: 16px; position: relative; overflow: hidden; box-shadow: 0 16px 50px rgba(20, 24, 40, .16); }
+.ticket-main { padding: 26px; display: grid; grid-template-columns: 150px 1fr; gap: 22px; }
+.ticket-main h1 { font-size: 28px; margin-bottom: 2px; }
+.kv { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px 20px; margin-top: 20px; }
+.kv small { display: block; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .07em; }
+.kv b { font-size: 16px; }
+.ticket-stub { border-left: 2px dashed #d6d7df; padding: 26px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; position: relative; text-align: center; background: #fafafc; }
+.ticket-stub::before, .ticket-stub::after { content: ""; position: absolute; left: -13px; width: 24px; height: 24px; border-radius: 50%; background: var(--bg); }
+.ticket-stub::before { top: -13px; } .ticket-stub::after { bottom: -13px; }
+.barcode { width: 100%; height: 76px; }
+.code { font-family: var(--display); font-size: 24px; font-weight: 800; letter-spacing: .08em; }
+.ticket.cancelled { filter: grayscale(1); opacity: .6; }
+.ok-head { text-align: center; margin-bottom: 24px; }
+.ok-head .tick { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 50%; background: var(--green-soft); border: 2px solid var(--green); display: grid; place-items: center; font-size: 30px; color: var(--green); }
+.ok-head h1 { font-size: 30px; }
+.actions { display: flex; gap: 12px; justify-content: center; margin-top: 24px; flex-wrap: wrap; }
+
+/* ── bookings ── */
+.bk { display: flex; gap: 16px; align-items: center; padding: 16px 18px; margin-bottom: 12px; flex-wrap: wrap; }
+.bk .info { flex: 1; min-width: 220px; }
+.bk h3 { font-family: var(--font); font-size: 16px; font-weight: 600; }
+
+/* ── drawer, toasts, modal, footer ── */
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(400px, 100vw); z-index: 70; background: #fff; transform: translateX(105%); transition: transform .25s ease; display: flex; flex-direction: column; box-shadow: -12px 0 40px rgba(0, 0, 0, .22); }
+.drawer.open { transform: none; }
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.drawer-head h3 { font-size: 19px; }
+.feed { list-style: none; margin: 0; padding: 12px; overflow-y: auto; flex: 1; background: #f7f7f9; }
+.feed li { padding: 12px 14px; border-radius: 10px; background: #fff; border: 1px solid var(--line); margin-bottom: 10px; animation: slidein .35s ease; }
+.feed li.agent { border-color: #b7a3f5; background: linear-gradient(135deg, #f3eeff, #fff); }
+.feed .top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.feed .who { font-weight: 700; color: var(--ink); }
+.feed .what b { color: var(--accent-dark); }
+.feed-empty { text-align: center; color: var(--muted); padding: 40px 20px; }
+@keyframes slidein { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+.toasts { position: fixed; top: 76px; right: 16px; z-index: 90; display: flex; flex-direction: column; gap: 10px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; padding: 12px 16px; border-radius: 10px; background: var(--nav); color: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); animation: slidein .3s ease; font-size: 14px; }
+.toast.agent { background: linear-gradient(135deg, #5b3fd1, #8b5cf6); }
+.toast.bad { background: #a01c37; }
+.toast b { color: #ffd14a; }
+.modal-bg { position: fixed; inset: 0; z-index: 100; background: rgba(10, 10, 20, .7); display: grid; place-items: center; padding: 20px; }
+.modal { width: min(480px, 100%); }
+.modal.video { width: min(860px, 100%); padding: 0; overflow: hidden; background: #000; }
+.modal.video iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; display: block; }
+.modal h3 { font-size: 21px; margin-bottom: 6px; }
+.confetti { position: fixed; top: -12px; width: 9px; height: 14px; z-index: 110; pointer-events: none; animation: fall linear forwards; }
+@keyframes fall { to { transform: translateY(105vh) rotate(720deg); opacity: .9; } }
+footer { background: var(--nav); color: #b5b8c8; padding: 26px 0 40px; font-size: 13px; margin-top: 40px; }
+footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+footer a { color: #fff; text-decoration: underline; }
+
+/* ── responsive ── */
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr; }
+  .theatre { grid-template-columns: 1fr; gap: 12px; }
+  .mhero-in { grid-template-columns: 170px 1fr; gap: 20px; }
+  .ticket { grid-template-columns: 1fr; }
+  .ticket-stub { border-left: 0; border-top: 2px dashed #d6d7df; }
+  .ticket-stub::before { top: -13px; left: -13px; } .ticket-stub::after { top: -13px; bottom: auto; left: auto; right: -13px; }
+  .city { display: none; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 14px; }
+  .top-row { gap: 10px; }
+  .brand span:last-child { display: none; }
+  .pill-btn .lbl { display: none; }
+  .slides { height: 240px; }
+  .slide-body { padding: 18px 20px; }
+  .slide-body p { display: none; }
+  .mhero-in { grid-template-columns: 1fr; text-align: left; }
+  .mposter { max-width: 170px; }
+  .rail .movie-card { flex-basis: 150px; }
+  .rail-btn { display: none; }
+  .ticket-main { grid-template-columns: 1fr; }
+  .ticket-main .poster { display: none; }
+  .row-2 { grid-template-columns: 1fr; }
+  .filter-row > b { width: 100%; }
+  :root { --seat: min(26px, calc((100vw - 132px) / 10)); }
+  .seat-card { padding: 20px 10px; }
+  .seat-row { gap: 4px; } .row-label { width: 16px; } .seat-row .row-label:last-child { display: none; } .aisle { width: 12px; }
+  .paybar .btn { min-width: 140px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+
+<body>
+<!-- ═════════════════════════════════ PAGE SHELL ═════════════════════════════════ -->
+<header class="top">
+  <div class="wrap top-row">
+    <a href="#/" class="brand" aria-label="TicketTown home"><span id="logo-slot"></span><span>Ticket<span class="town">Town</span></span></a>
+    <div class="search">
+      <svg class="mag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search for movies" autocomplete="off" aria-label="Search movies">
+      <div class="search-results hidden" id="search-results"></div>
+    </div>
+    <div class="spacer"></div>
+    <span class="city">📍 Bengaluru</span>
+    <button class="pill-btn" id="live-pill" data-action="open-live" title="Live booking activity">
+      <span class="dot"></span><span class="lbl" id="live-label">Connecting…</span><span class="badge-count hidden" id="live-count">0</span>
+    </button>
+    <button class="icon-btn" data-action="open-settings" title="Backend settings" aria-label="Backend settings">⚙</button>
+  </div>
+  <nav class="subnav"><div class="wrap">
+    <a href="#/" data-nav="home">Movies</a>
+    <a href="#/bookings" data-nav="bookings">My bookings</a>
+  </div></nav>
+</header>
+
+<main id="app"></main>
+
+<footer>
+  <div class="wrap">
+    <span>🎟️ TicketTown is a workshop demo. No real tickets are sold and no real payments are taken.</span>
+    <span><span id="footer-tmdb" class="hidden">This product uses the TMDB API but is not endorsed or certified by <a href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>. · </span><span id="footer-api"></span></span>
+  </div>
+</footer>
+
+<aside class="drawer" id="drawer" aria-label="Live activity">
+  <div class="drawer-head">
+    <div><h3>⚡ Live activity</h3><div class="hint">Every booking, from the website or the AI agent</div></div>
+    <button class="icon-btn" data-action="close-live" aria-label="Close">✕</button>
+  </div>
+  <ul class="feed" id="feed"></ul>
+</aside>
+
+<div class="paybar" id="paybar"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="modal-root"></div>
+
+<!-- ═════════════════════════════════ APP LOGIC ═════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ───────────────────────────── CONFIG (edit me) ─────────────────────────────
+   1) Put your deployed backend URL here (no trailing slash), e.g.
+        const TICKETTOWN_API_URL = 'https://tickettown-api.onrender.com';
+   2) Or leave it and use the ⚙ button in the header - it saves the URL in
+      this browser only, so you can switch backends live on stage.
+   3) Flip SHOW_AGENT_HINT to true once the Orchestrate chat is embedded.
+   (Movie posters come from TMDB via the backend. No TMDB key belongs here.) */
+const TICKETTOWN_API_URL = 'http://localhost:3000';
+const SHOW_AGENT_HINT = false;
+const MAX_SEATS = 6;
+
+/* ───────────────────────────── logo ───────────────────────────── */
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TicketTown logo">
+  <defs><linearGradient id="ttg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff4d6d"/><stop offset="1" stop-color="#ff9f1c"/></linearGradient></defs>
+  <path fill="url(#ttg)" d="M10 10H54a6 6 0 0 1 6 6V26a6 6 0 0 0 0 12V48a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V38a6 6 0 0 0 0-12V16a6 6 0 0 1 6-6Z"/>
+  <circle cx="17" cy="21" r="3.6" fill="#fff" opacity=".95"/>
+  <g fill="#1a1027"><rect x="12" y="38" width="7" height="16"/><rect x="21" y="30" width="8" height="24"/><rect x="31" y="36" width="6" height="18"/><rect x="39" y="24" width="9" height="30"/><rect x="50" y="40" width="4" height="14"/></g>
+  <g fill="#ffd166"><rect x="23" y="33" width="2" height="2.5"/><rect x="26" y="33" width="2" height="2.5"/><rect x="23" y="39" width="2" height="2.5"/><rect x="26" y="45" width="2" height="2.5"/><rect x="41.5" y="28" width="2" height="2.5"/><rect x="45" y="28" width="2" height="2.5"/><rect x="41.5" y="35" width="2" height="2.5"/><rect x="45" y="42" width="2" height="2.5"/><rect x="14" y="42" width="2" height="2.5"/><rect x="33" y="40" width="2" height="2.5"/></g>
+</svg>`;
+
+/* ───────────────────────────── helpers ───────────────────────────── */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+const app = $('#app');
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const inr = (n) => '₹' + Number(n).toLocaleString('en-IN');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode etc. */ } },
+};
+const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const fmtDur = (min) => `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}m`;
+const fmtVotes = (n) => (n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K' : String(n ?? 0));
+const fmtRelease = (iso) => (iso ? new Date(iso + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+function fmtDate(iso, long = false) {
+  const d = new Date(iso + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - today) / 86400000);
+  const base = d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  if (diff === 0) return long ? `Today, ${base}` : 'Today';
+  if (diff === 1) return long ? `Tomorrow, ${base}` : 'Tomorrow';
+  return base;
+}
+const ago = (ts) => {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 10) return 'just now';
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
+};
+const apiBase = () => (store.get('tt_api_base') || TICKETTOWN_API_URL).replace(/\/+$/, '');
+
+// ngrok's free plan answers browsers with a warning page (no CORS headers) unless this header is sent.
+// We only add it for ngrok URLs, so other hosts don't get an extra CORS preflight.
+const extraHeaders = () => (/ngrok/i.test(apiBase()) ? { 'ngrok-skip-browser-warning': '1' } : {});
+
+async function api(path, { method = 'GET', body } = {}) {
+  let res;
+  const headers = { ...extraHeaders(), ...(body ? { 'Content-Type': 'application/json' } : {}) };
+  try {
+    res = await fetch(apiBase() + path, {
+      method,
+      headers: Object.keys(headers).length ? headers : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw Object.assign(new Error('Cannot reach the TicketTown backend.'), { network: true });
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { status: res.status, code: data.code, data });
+  return data;
+}
+
+// Seat prices depend on the row's tier (Silver / Gold / Platinum), sent by the backend on every show.
+const tierOf = (show, seat) => show.tiers.find((t) => t.rows.includes(seat[0])) || show.tiers[show.tiers.length - 1];
+const seatTotal = (show, seats) => seats.reduce((sum, s) => sum + tierOf(show, s).price, 0);
+const seatSort = (a, b) => a[0].localeCompare(b[0]) || a.slice(1) - b.slice(1);
+function groupByTier(show, seats) {
+  const groups = {};
+  for (const s of [...seats].sort(seatSort)) (groups[tierOf(show, s).name] ??= { tier: tierOf(show, s), seats: [] }).seats.push(s);
+  return Object.values(groups);
+}
+
+// Works with both movie objects (/api/movies) and show objects (/api/shows), which name the title differently.
+function posterHTML(m, { small = false } = {}) {
+  const title = m.title || m.movie_title;
+  const img = m.poster_url
+    ? `<img src="${esc(m.poster_url)}" alt="${esc(title)} poster" loading="lazy" onerror="this.parentNode.classList.remove('has-img');this.remove()">`
+    : '';
+  const strip = m.score
+    ? `<div class="strip"><span><span class="star">★</span> ${Number(m.score).toFixed(1)}/10</span><span>${fmtVotes(m.votes)} Votes</span></div>`
+    : `<div class="strip"><span>${esc(m.rating || '')}</span><span>${esc(m.language || '')}</span></div>`;
+  return `<div class="poster ${small ? 'sm' : ''} ${m.poster_url ? 'has-img' : ''}" style="--c1:${esc(m.color1)};--c2:${esc(m.color2)}">
+    ${img}<span class="poster-emoji">${esc(m.emoji)}</span><span class="poster-title">${esc(title)}</span>${small ? '' : strip}</div>`;
+}
+
+const STATUS = {
+  CONFIRMED: ['ok', 'Confirmed'],
+  PENDING_PAYMENT: ['warn', 'Awaiting payment'],
+  CANCELLED: ['dim', 'Cancelled'],
+  EXPIRED: ['bad', 'Hold expired'],
+};
+const statusPill = (s) => `<span class="pill ${STATUS[s]?.[0] ?? 'dim'}">${STATUS[s]?.[1] ?? esc(s)}</span>`;
+
+/* ───────────────────────────── state ───────────────────────────── */
+const state = {
+  movies: [], source: 'demo', lang: 'All', genre: 'All',
+  movie: null, shows: [], date: null, tod: 'any',
+  show: null, seatMap: { booked: new Set(), held: new Set() }, selected: new Set(), flash: new Set(),
+  view: { name: 'home', arg: null },
+  token: 0, timers: [],
+  payMethod: 'card', justPaid: false,
+  myCodes: new Set(), creating: false, // creating: a booking POST from this browser is in flight
+  feed: [], unread: 0, live: false, drawerOpen: false,
+};
+
+const stale = (t) => t !== state.token;
+const clearTimers = () => { state.timers.forEach(clearInterval); state.timers = []; };
+
+function renderLoading(msg = 'Loading…') { app.innerHTML = `<div class="center"><div class="spinner"></div><div class="muted">${esc(msg)}</div></div>`; }
+
+function renderError(err, retry = true) {
+  const net = err.network;
+  app.innerHTML = `
+    <div class="card center wrap" style="max-width:560px;margin:40px auto">
+      <div style="font-size:42px">${net ? '🔌' : '⚠️'}</div>
+      <h2 style="margin:10px 0 8px">${net ? "Can't reach the backend" : 'Something went wrong'}</h2>
+      <p class="muted">${net ? `Tried <code>${esc(apiBase())}</code>. Is the server running, and is the URL right?` : esc(err.message)}</p>
+      <div class="actions">
+        ${retry ? '<button class="btn" data-action="retry">Try again</button>' : ''}
+        ${net ? '<button class="btn ghost" data-action="open-settings">Change backend URL</button>' : ''}
+      </div>
+    </div>`;
+}
+
+function toast(html, kind = '') {
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.innerHTML = html;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = ['#f84464', '#ff9f1c', '#ffd166', '#7c3aed', '#1ea83c', '#38bdf8'];
+  for (let i = 0; i < 70; i++) {
+    const el = document.createElement('i');
+    el.className = 'confetti';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.background = colors[i % colors.length];
+    el.style.animationDuration = 1.8 + Math.random() * 2 + 's';
+    el.style.animationDelay = Math.random() * 0.6 + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4800);
+  }
+}
+
+async function ensureMovies(force = false) {
+  if (state.movies.length && !force) return state.movies;
+  const { movies, source } = await api('/api/movies');
+  state.movies = movies;
+  state.source = source;
+  $('#footer-tmdb').classList.toggle('hidden', source !== 'tmdb');
+  return movies;
+}
+
+/* ───────────────────────────── router ───────────────────────────── */
+function route() {
+  clearTimers();
+  const [, name = '', arg = ''] = location.hash.split('/');
+  const token = ++state.token;
+  state.view = { name: name || 'home', arg };
+  $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (name === 'bookings' ? 'bookings' : ['', 'movie', 'book', 'show'].includes(name) ? 'home' : '')));
+  $('#paybar').classList.remove('show');
+  window.scrollTo({ top: 0 });
+
+  const views = { '': viewHome, movie: viewMovie, book: viewBook, show: viewShow, details: viewDetails, pay: viewPay, ticket: viewTicket, bookings: viewBookings };
+  const fn = views[name];
+  if (!fn) { location.hash = '#/'; return; }
+  Promise.resolve(fn(arg, token)).catch((err) => { if (!stale(token)) renderError(err); });
+}
+window.addEventListener('hashchange', route);
+const go = (hash) => { if (location.hash === hash) route(); else location.hash = hash; };
+
+/* ───────────────────────────── view: home ───────────────────────────── */
+async function viewHome(_, token) {
+  if (!state.movies.length) renderLoading('Loading movies…');
+  await ensureMovies(true);
+  if (stale(token)) return;
+  drawHome();
+  startHero();
+}
+
+let heroIdx = 0;
+function startHero() {
+  const slides = $$('.slide');
+  if (slides.length < 2) return;
+  const show = (i) => {
+    heroIdx = (i + slides.length) % slides.length;
+    slides.forEach((s, n) => s.classList.toggle('on', n === heroIdx));
+    $$('.dots button').forEach((d, n) => d.classList.toggle('on', n === heroIdx));
+  };
+  const hero = $('#hero');
+  let paused = false;
+  hero.addEventListener('mouseenter', () => { paused = true; });
+  hero.addEventListener('mouseleave', () => { paused = false; });
+  state.heroShow = show;
+  state.timers.push(setInterval(() => { if (!paused) show(heroIdx + 1); }, 5000));
+}
+
+function movieCard(m) {
+  return `<button class="movie-card" data-action="go" data-href="#/movie/${m.id}">
+    ${posterHTML(m)}
+    <h3>${esc(m.title)}</h3>
+    <div class="sub">${esc(m.genres.slice(0, 2).join(' / '))}</div>
+  </button>`;
+}
+
+function drawHome() {
+  const movies = state.movies;
+  const slides = movies.filter((m) => m.backdrop_url).slice(0, 5);
+  const heroMovies = slides.length ? slides : movies.slice(0, 4);
+  const recommended = [...movies].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 10);
+  const langs = ['All', ...new Set(movies.map((m) => m.language))];
+  const genres = ['All', ...new Set(movies.flatMap((m) => m.genres))];
+  const list = movies.filter((m) => (state.lang === 'All' || m.language === state.lang) && (state.genre === 'All' || m.genres.includes(state.genre)));
+  heroIdx = 0;
+
+  app.innerHTML = `
+    <div class="wrap">
+      <section class="hero" id="hero" aria-label="Featured movies">
+        <div class="slides">
+          ${heroMovies.map((m, i) => `
+            <div class="slide ${i === 0 ? 'on' : ''}" data-action="go" data-href="#/movie/${m.id}" role="link" tabindex="0"
+                 style="background-image:${m.backdrop_url ? `url('${esc(m.backdrop_url)}'),` : ''}linear-gradient(120deg,${esc(m.color1)},${esc(m.color2)})">
+              <div class="slide-body">
+                <span class="tag">In cinemas</span>
+                <h2>${esc(m.title)}</h2>
+                <p>${esc(m.genres.slice(0, 3).join(' • '))} • ${esc(m.language)}${m.score ? ` • ★ ${Number(m.score).toFixed(1)}/10` : ''}</p>
+                <button class="btn" tabindex="-1">Book tickets</button>
+              </div>
+            </div>`).join('')}
+        </div>
+        ${heroMovies.length > 1 ? `
+          <button class="hero-arrow prev" data-action="hero-prev" aria-label="Previous">‹</button>
+          <button class="hero-arrow next" data-action="hero-next" aria-label="Next">›</button>
+          <div class="dots">${heroMovies.map((_, i) => `<button class="${i === 0 ? 'on' : ''}" data-action="hero-go" data-i="${i}" aria-label="Slide ${i + 1}"></button>`).join('')}</div>` : ''}
+      </section>
+      ${SHOW_AGENT_HINT ? `<div class="agent-hint">🤖 <span>Try the assistant (bottom-right): <b>"Book 2 seats for Agent 404 tomorrow morning"</b></span></div>` : ''}
+
+      <div class="sec-head"><h2>Recommended Movies</h2><button class="see-all" data-action="see-all">See All ›</button></div>
+      <div class="rail-wrap">
+        <button class="rail-btn l" data-action="rail" data-dir="-1" aria-label="Scroll left">‹</button>
+        <div class="rail" id="rail">${recommended.map(movieCard).join('')}</div>
+        <button class="rail-btn r" data-action="rail" data-dir="1" aria-label="Scroll right">›</button>
+      </div>
+
+      <div class="sec-head" id="all-movies"><h2>Movies in cinemas</h2></div>
+      <div class="filters">
+        <div class="filter-row"><b>Language</b><div class="chips">${langs.map((l) => `<button class="chip ${l === state.lang ? 'on' : ''}" data-action="lang" data-v="${esc(l)}">${esc(l)}</button>`).join('')}</div></div>
+        <div class="filter-row"><b>Genre</b><div class="chips">${genres.map((g) => `<button class="chip ${g === state.genre ? 'on' : ''}" data-action="genre" data-v="${esc(g)}">${esc(g)}</button>`).join('')}</div></div>
+      </div>
+      <div class="movie-grid">${list.length ? list.map(movieCard).join('') : '<div class="muted">No movies match these filters.</div>'}</div>
+    </div>`;
+}
+
+/* ───────────────────────────── view: movie details ───────────────────────────── */
+async function viewMovie(id, token) {
+  renderLoading('Loading movie…');
+  const { movie } = await api(`/api/movies/${Number(id)}`);
+  if (stale(token)) return;
+  state.movie = movie;
+  const bd = movie.backdrop_url ? `style="--bd:url('${esc(movie.backdrop_url)}')"` : `style="--c1:${esc(movie.color1)};--c2:${esc(movie.color2)}"`;
+  app.innerHTML = `
+    <section class="mhero ${movie.backdrop_url ? '' : 'nobd'}" ${bd}>
+      <div class="wrap mhero-in">
+        <div class="mposter">${posterHTML({ ...movie, score: null })}<div class="in-cinemas">In cinemas</div></div>
+        <div class="minfo">
+          <h1>${esc(movie.title)}</h1>
+          ${movie.tagline ? `<p class="tagline">${esc(movie.tagline)}</p>` : ''}
+          ${movie.score ? `<div class="score-pill"><span class="star">★</span> ${Number(movie.score).toFixed(1)}/10 <small>${fmtVotes(movie.votes)} Votes</small></div>` : ''}
+          <div class="fmts"><span>2D</span><span>${esc(movie.language)}</span></div>
+          <div class="meta-line">${fmtDur(movie.duration_min)} • ${esc(movie.genres.join(', '))} • ${esc(movie.rating)}${movie.release_date ? ` • ${fmtRelease(movie.release_date)}` : ''}</div>
+          <div class="cta">
+            <button class="btn" style="font-size:16px;padding:13px 34px" data-action="go" data-href="#/book/${movie.id}" ${movie.upcoming_shows ? '' : 'disabled'}>Book tickets</button>
+            ${movie.trailer_key ? `<button class="btn light" data-action="trailer" data-key="${esc(movie.trailer_key)}">▶ Watch trailer</button>` : ''}
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="about"><div class="wrap">
+      <h2 class="sec-title">About the movie</h2>
+      <p>${esc(movie.description)}</p>
+      ${movie.cast?.length ? `
+        <h2 class="sec-title" style="margin-top:30px">Cast</h2>
+        <div class="cast">${movie.cast.map((c) => `
+          <div class="cast-item">
+            <div class="ph">${esc(c.name.split(' ').map((p) => p[0]).slice(0, 2).join(''))}${c.photo_url ? `<img src="${esc(c.photo_url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</div>
+            <b>${esc(c.name)}</b><small>${esc(c.character || '')}</small>
+          </div>`).join('')}</div>` : ''}
+    </div></section>`;
+}
+
+/* ───────────────────────────── view: showtimes ───────────────────────────── */
+async function viewBook(id, token) {
+  renderLoading('Finding showtimes…');
+  const [{ movie }, { shows }] = await Promise.all([api(`/api/movies/${Number(id)}`), api(`/api/shows?movie_id=${Number(id)}`)]);
+  if (stale(token)) return;
+  if (state.movie?.id !== movie.id) state.date = null;
+  state.movie = movie;
+  state.shows = shows;
+  const dates = [...new Set(shows.map((s) => s.date))];
+  if (!dates.includes(state.date)) state.date = dates[0] ?? null;
+  drawBook();
+}
+
+const TOD = { any: 'Any time', morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', night: 'Night' };
+function timeOfDay(t) { const h = Number(t.split(':')[0]); return h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'night'; }
+
+function drawBook() {
+  const m = state.movie;
+  const dates = [...new Set(state.shows.map((s) => s.date))];
+  const day = state.shows.filter((s) => s.date === state.date && (state.tod === 'any' || timeOfDay(s.time) === state.tod));
+  const byTheatre = day.reduce((acc, s) => ((acc[s.theatre] ??= []).push(s), acc), {});
+  app.innerHTML = `
+    <div class="bk-head"><div class="wrap">
+      <a href="#/movie/${m.id}" class="back">‹ ${esc(m.title)}</a>
+      <h1>${esc(m.title)} <span class="tag" style="vertical-align:middle">${esc(m.rating)}</span></h1>
+      <div class="tags">${m.genres.map((g) => `<span class="tag">${esc(g)}</span>`).join('')}<span class="tag">${esc(m.language)}</span></div>
+    </div></div>
+    ${dates.length ? `
+    <div class="datebar"><div class="wrap dates">${dates.map((d) => {
+      const dt = new Date(d + 'T00:00:00');
+      return `<button class="date-tab ${d === state.date ? 'on' : ''}" data-action="pick-date" data-date="${d}">
+        <div class="d1">${dt.toLocaleDateString('en-IN', { weekday: 'short' })}</div><div class="d2">${dt.getDate()}</div><div class="d3">${dt.toLocaleDateString('en-IN', { month: 'short' })}</div></button>`;
+    }).join('')}</div></div>
+    <div class="filterbar"><div class="wrap">
+      <div class="chips">${Object.entries(TOD).map(([k, l]) => `<button class="chip ${state.tod === k ? 'on' : ''}" data-action="pick-tod" data-v="${k}">${l}</button>`).join('')}</div>
+      <div class="legend-inline"><span><i style="background:var(--green)"></i>Available</span><span><i style="background:var(--amber)"></i>Filling fast</span><span><i style="background:#c9c9d1"></i>Sold out</span></div>
+    </div></div>
+    <div class="wrap pad">
+      ${Object.keys(byTheatre).length ? Object.entries(byTheatre).map(([theatre, shows]) => `
+        <div class="theatre">
+          <div><h3>${esc(theatre)}</h3><div class="hint">${esc(shows[0].screen)} · Ticket cancellation available</div></div>
+          <div class="slots">${shows.map((s) => {
+            const cls = s.seats_available === 0 ? 'sold' : s.seats_available <= 15 ? 'fast' : 'ok';
+            const tip = `${s.tiers.map((t) => `${t.name} ${inr(t.price)}`).join(' · ')} — ${s.seats_available === 0 ? 'sold out' : s.seats_available + ' seats left'}`;
+            return `<button class="tp ${cls}" ${s.seats_available === 0 ? 'disabled' : ''} title="${esc(tip)}" data-action="go" data-href="#/show/${s.id}">
+              <b>${fmtTime(s.time)}</b><small>${s.seats_available === 0 ? 'Sold out' : `from ${inr(s.price)}`}</small></button>`;
+          }).join('')}</div>
+        </div>`).join('') : '<div class="card center">No shows match this time of day. Try another filter.</div>'}
+    </div>` : `<div class="wrap pad"><div class="card center">No upcoming shows for this movie.</div></div>`}`;
+}
+
+async function refreshShowtimes() {
+  if (state.view.name !== 'book' || !state.movie) return;
+  const { shows } = await api(`/api/shows?movie_id=${state.movie.id}`);
+  if (state.view.name !== 'book') return;
+  state.shows = shows;
+  drawBook();
+}
+
+/* ───────────────────────────── view: seat selection ───────────────────────────── */
+const stepsHTML = (n) => {
+  const labels = ['Seats', 'Your details', 'Payment', 'Ticket'];
+  return `<div class="steps">${labels.map((l, i) => `
+    <span class="step ${i + 1 < n ? 'done' : i + 1 === n ? 'now' : ''}"><i>${i + 1 < n ? '✓' : i + 1}</i>${l}</span>${i < labels.length - 1 ? '<span class="step-sep"></span>' : ''}`).join('')}</div>`;
+};
+
+async function viewShow(id, token) {
+  renderLoading('Loading seat map…');
+  const data = await api(`/api/shows/${Number(id)}`);
+  if (stale(token)) return;
+  if (state.show?.id !== data.show.id) state.selected.clear();
+  applySeatData(data);
+  drawShow();
+}
+
+function applySeatData(data) {
+  state.show = data.show;
+  state.seatMap = { booked: new Set(data.seats.booked), held: new Set(data.seats.held) };
+  for (const s of [...state.selected]) if (state.seatMap.booked.has(s) || state.seatMap.held.has(s)) state.selected.delete(s);
+}
+
+function seatRowHTML(letter) {
+  const s = state.show;
+  let row = `<span class="row-label">${letter}</span>`;
+  for (let c = 1; c <= s.cols; c++) {
+    const label = letter + c;
+    const booked = state.seatMap.booked.has(label);
+    const held = state.seatMap.held.has(label);
+    const sel = state.selected.has(label);
+    const cls = booked ? 'booked' : held ? 'held' : sel ? 'selected' : '';
+    const stateText = booked ? 'sold' : held ? 'held by another customer' : sel ? 'selected' : 'available';
+    row += `<button class="seat ${cls} ${state.flash.has(label) ? 'flash' : ''}" data-action="toggle-seat" data-seat="${label}" ${booked || held ? 'disabled' : ''} aria-label="Seat ${label}, ${tierOf(s, label).name} ${inr(tierOf(s, label).price)}, ${stateText}">${c}</button>`;
+    if (c === s.aisle_after) row += '<span class="aisle"></span>';
+  }
+  return `<div class="seat-row">${row}<span class="row-label">${letter}</span></div>`;
+}
+
+// Back rows at the top, screen at the bottom (like a real hall).
+function seatMapHTML() {
+  return [...state.show.tiers].reverse().map((t) => `
+    <div class="tier">
+      <div class="tier-h"><b>${inr(t.price)}</b> ${esc(t.name.toUpperCase())}</div>
+      <div class="seatmap">${[...t.rows].reverse().map(seatRowHTML).join('')}</div>
+    </div>`).join('');
+}
+
+function paybarHTML() {
+  const s = state.show;
+  const seats = [...state.selected];
+  if (!seats.length) return '';
+  const groups = groupByTier(s, seats);
+  return `<div class="wrap">
+    <div><b>${seats.length} seat${seats.length > 1 ? 's' : ''} selected</b>
+      <small>${groups.map((g) => `${esc(g.tier.name)} ${g.seats.join(', ')}`).join(' · ')}</small></div>
+    <button class="btn" data-action="continue">Pay ${inr(seatTotal(s, seats))}</button></div>`;
+}
+
+function updatePaybar() {
+  const bar = $('#paybar');
+  if (state.selected.size) bar.innerHTML = paybarHTML(); // keep the old content while it slides away
+  bar.classList.toggle('show', state.selected.size > 0 && state.view.name === 'show');
+}
+
+function drawShow() {
+  const s = state.show;
+  if (s.started) {
+    app.innerHTML = `<div class="card center wrap" style="max-width:520px;margin:40px auto"><h2>This show has already started</h2><p class="muted">Pick another showtime.</p><div class="actions"><a class="btn" href="#/book/${s.movie_id}">See other showtimes</a></div></div>`;
+    return;
+  }
+  app.innerHTML = `
+    <div class="seat-top"><div class="wrap">
+      <a href="#/book/${s.movie_id}" class="back" style="margin:0;font-size:22px" aria-label="Back to showtimes">‹</a>
+      <div class="ttl"><b>${esc(s.movie_title)}</b><small>${esc(s.theatre)} · ${esc(s.screen)} · ${fmtDate(s.date, true)}, ${fmtTime(s.time)}</small></div>
+      <div class="quick"><span>✨ Best seats together:</span>${[1, 2, 3, 4].map((n) => `<button class="chip" data-action="suggest" data-count="${n}">${n}</button>`).join('')}</div>
+    </div></div>
+    <div class="wrap">
+      <section class="card seat-card">
+        <div id="seatmap-root">${seatMapHTML()}</div>
+        <div class="screen"></div><div class="screen-label">Screen this way</div>
+        <div class="legend">
+          <span><i class="seat"></i>Available</span><span><i class="seat selected"></i>Selected</span>
+          <span><i class="seat held"></i>Held by someone</span><span><i class="seat booked"></i>Sold</span>
+        </div>
+      </section>
+    </div>`;
+  updatePaybar();
+}
+
+const redrawSeats = () => { const m = $('#seatmap-root'); if (m) m.innerHTML = seatMapHTML(); updatePaybar(); };
+
+// Re-fetch the seat map (called when a live event says this show changed).
+async function refreshSeats() {
+  if (state.view.name !== 'show' || !state.show) return;
+  const before = new Set([...state.seatMap.booked, ...state.seatMap.held]);
+  const wasSelected = new Set(state.selected);
+  const data = await api(`/api/shows/${state.show.id}`);
+  if (state.view.name !== 'show' || state.show.id !== data.show.id) return;
+  applySeatData(data);
+  const now = new Set([...state.seatMap.booked, ...state.seatMap.held]);
+  state.flash = new Set([...now].filter((x) => !before.has(x)));
+  const lost = [...wasSelected].filter((x) => !state.selected.has(x));
+  if (lost.length) toast(`Seat${lost.length > 1 ? 's' : ''} <b>${lost.join(', ')}</b> just got taken. Please pick another.`, 'bad');
+  redrawSeats();
+  setTimeout(() => state.flash.clear(), 1600);
+}
+
+/* ───────────────────────────── view: details (email + phone) ───────────────────────────── */
+function viewDetails() {
+  const s = state.show;
+  if (!s || !state.selected.size) { location.hash = '#/'; return; }
+  const seats = [...state.selected];
+  app.innerHTML = `
+    <div class="wrap pad">
+    <a href="#/show/${s.id}" class="back">‹ Change seats</a>
+    ${stepsHTML(2)}
+    <div class="two-col narrow">
+      <form class="card" id="details-form" novalidate>
+        <h2 style="margin-bottom:6px">Where should we send your ticket?</h2>
+        <p class="muted" style="margin-top:0">We hold your seats for a few minutes once you continue.</p>
+        <div class="field"><label for="email">Email</label>
+          <input class="input" id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" value="${esc(store.get('tt_email') || '')}">
+          <div class="field-err" data-err="email"></div></div>
+        <div class="field"><label for="phone">Phone number</label>
+          <input class="input" id="phone" name="phone" type="tel" autocomplete="tel" placeholder="98765 43210" value="${esc(store.get('tt_phone') || '')}">
+          <div class="field-err" data-err="phone"></div></div>
+        <div class="field"><label for="name">Name <small>(optional)</small></label>
+          <input class="input" id="name" name="name" autocomplete="name" placeholder="Your name"></div>
+        <div id="form-error"></div>
+        <button class="btn block" id="details-submit" type="submit">Proceed to payment</button>
+        <p class="hint" style="text-align:center;margin-bottom:0">Demo app: no emails or SMS are actually sent.</p>
+      </form>
+      <aside class="card order">
+        <h3>Booking summary</h3>
+        <div class="line"><span>Movie</span><b>${esc(s.movie_title)}</b></div>
+        <div class="line"><span>Theatre</span><b>${esc(s.theatre)}</b></div>
+        <div class="line"><span>When</span><b>${fmtDate(s.date)} · ${fmtTime(s.time)}</b></div>
+        ${groupByTier(s, seats).map((g) => `<div class="line"><span>${esc(g.tier.name)} · ${g.seats.length} × ${inr(g.tier.price)}</span><b>${g.seats.join(', ')}</b></div>`).join('')}
+        <div class="line total"><span>Total</span><b>${inr(seatTotal(s, seats))}</b></div>
+      </aside>
+    </div></div>`;
+}
+
+async function submitDetails(form) {
+  const email = form.email.value.trim();
+  const phone = form.phone.value.trim();
+  const errs = {};
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errs.email = 'Enter a valid email address.';
+  if (!/^\+?\d{10,13}$/.test(phone.replace(/[\s\-()]/g, ''))) errs.phone = 'Enter a valid phone number (10-13 digits).';
+  ['email', 'phone'].forEach((k) => {
+    $(`[data-err="${k}"]`, form).textContent = errs[k] || '';
+    form[k].classList.toggle('bad', !!errs[k]);
+  });
+  if (Object.keys(errs).length) return;
+
+  const btn = $('#details-submit');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Holding your seats…';
+  $('#form-error').innerHTML = '';
+  state.creating = true; // the live event can arrive before the POST response does
+  try {
+    const { booking } = await api('/api/bookings', {
+      method: 'POST',
+      body: { show_id: state.show.id, seats: [...state.selected], email, phone, name: form.name.value.trim() || undefined, source: 'web' },
+    });
+    state.myCodes.add(booking.code);
+    setTimeout(() => { state.creating = false; }, 1500);
+    store.set('tt_email', email); store.set('tt_phone', phone);
+    state.selected.clear();
+    location.hash = `#/pay/${booking.code}`;
+  } catch (err) {
+    state.creating = false;
+    btn.disabled = false; btn.textContent = 'Proceed to payment';
+    if (err.code === 'SEATS_TAKEN') {
+      toast(`Sorry, <b>${(err.data.taken || []).join(', ')}</b> were just booked by someone else.`, 'bad');
+      location.hash = `#/show/${state.show.id}`;
+    } else {
+      $('#form-error').innerHTML = `<div class="err-box">${esc(err.network ? "Can't reach the backend. Check the ⚙ settings." : err.message)}</div>`;
+    }
+  }
+}
+
+/* ───────────────────────────── view: payment (mock) ───────────────────────────── */
+async function viewPay(code, token) {
+  renderLoading('Loading your booking…');
+  const { booking: b } = await api(`/api/bookings/${encodeURIComponent(code)}`);
+  if (stale(token)) return;
+  if (b.status === 'CONFIRMED') { location.hash = `#/ticket/${b.code}`; return; }
+  if (b.status !== 'PENDING_PAYMENT') { drawPayDead(b); return; }
+  drawPay(b);
+  const expiresAt = b.hold_expires_at;
+  const tick = () => {
+    const left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+    const el = $('#countdown');
+    if (el) el.textContent = `${String(Math.floor(left / 60)).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+    if (left === 0) { clearTimers(); route(); }
+  };
+  tick();
+  state.timers.push(setInterval(tick, 1000));
+}
+
+function drawPayDead(b) {
+  const expired = b.status === 'EXPIRED';
+  app.innerHTML = `<div class="card center wrap" style="max-width:520px;margin:40px auto">
+    <div style="font-size:42px">${expired ? '⏰' : '🚫'}</div>
+    <h2 style="margin:10px 0 8px">${expired ? 'Your seat hold expired' : 'This booking was cancelled'}</h2>
+    <p class="muted">${expired ? 'The seats were released so others can book them.' : 'No charge was made.'}</p>
+    <div class="actions"><a class="btn" href="#/show/${b.show.id}">Pick seats again</a></div></div>`;
+}
+
+function drawPay(b) {
+  app.innerHTML = `
+    <div class="wrap pad">
+    ${stepsHTML(3)}
+    <div class="two-col narrow">
+      <section class="card">
+        <div class="timer"><span>⏱ Seats held for you</span><b id="countdown">--:--</b></div>
+        <div class="demo-banner"><span>🧪 <b>Demo payment.</b> Nothing is charged. Card <code>4000 0000 0000 0002</code> simulates a decline.</span>
+          <button class="chip" type="button" data-action="use-test-card">Fill test card</button></div>
+        <div class="tabs" role="tablist">
+          ${[['card', '💳 Card'], ['upi', '📱 UPI'], ['wallet', '👛 Wallet']].map(([k, l]) => `<button type="button" class="tab ${state.payMethod === k ? 'on' : ''}" data-action="pay-tab" data-method="${k}">${l}</button>`).join('')}
+        </div>
+        <form id="pay-form" novalidate data-code="${esc(b.code)}">
+          <div data-pane="card" class="${state.payMethod === 'card' ? '' : 'hidden'}">
+            <div class="field"><label for="card">Card number</label><input class="input" id="card" inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242" data-format="card" maxlength="23"></div>
+            <div class="row-2">
+              <div class="field"><label for="exp">Expiry</label><input class="input" id="exp" inputmode="numeric" autocomplete="off" placeholder="MM/YY" data-format="exp" maxlength="5"></div>
+              <div class="field"><label for="cvv">CVV</label><input class="input" id="cvv" inputmode="numeric" autocomplete="off" placeholder="123" data-format="cvv" maxlength="4"></div>
+            </div>
+          </div>
+          <div data-pane="upi" class="${state.payMethod === 'upi' ? '' : 'hidden'}">
+            <div class="field"><label for="upi">UPI ID</label><input class="input" id="upi" autocomplete="off" placeholder="name@bank"></div>
+          </div>
+          <div data-pane="wallet" class="${state.payMethod === 'wallet' ? '' : 'hidden'}">
+            <p class="muted">Pay instantly from your TicketTown demo wallet. No details needed.</p>
+          </div>
+          <div id="pay-error"></div>
+          <button class="btn block" id="pay-btn" type="submit" style="margin-top:8px;font-size:16px">Pay ${inr(b.amount)}</button>
+          <div class="secure">🔒 Demo checkout · no real payment</div>
+          <div style="text-align:center;margin-top:14px"><button type="button" class="chip" data-action="cancel-hold" data-code="${esc(b.code)}">Cancel &amp; release seats</button></div>
+        </form>
+      </section>
+      <aside class="card order">
+        <h3>Order summary</h3>
+        <div class="line"><span>Booking</span><b>${esc(b.code)}</b></div>
+        <div class="line"><span>Movie</span><b>${esc(b.show.movie_title)}</b></div>
+        <div class="line"><span>Theatre</span><b>${esc(b.show.theatre)}</b></div>
+        <div class="line"><span>When</span><b>${fmtDate(b.show.date)} · ${fmtTime(b.show.time)}</b></div>
+        <div class="line"><span>Seats</span><b>${b.seats.join(', ')}</b></div>
+        <div class="line"><span>Contact</span><b>${esc(b.email)}<br>${esc(b.phone)}</b></div>
+        <div class="line total"><span>Total</span><b>${inr(b.amount)}</b></div>
+      </aside>
+    </div></div>`;
+}
+
+async function submitPayment(form) {
+  const code = form.dataset.code;
+  const method = state.payMethod;
+  const body = { method };
+  if (method === 'card') body.card_number = $('#card').value;
+  if (method === 'upi') body.upi_id = $('#upi').value.trim();
+  const errBox = $('#pay-error');
+  errBox.innerHTML = '';
+
+  if (method === 'card') {
+    const digits = body.card_number.replace(/\D/g, '');
+    if (digits.length < 12) return (errBox.innerHTML = '<div class="err-box">Enter a valid card number.</div>');
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test($('#exp').value)) return (errBox.innerHTML = '<div class="err-box">Enter the expiry as MM/YY.</div>');
+    if ($('#cvv').value.length < 3) return (errBox.innerHTML = '<div class="err-box">Enter the 3-digit CVV.</div>');
+  }
+  if (method === 'upi' && !/^[\w.\-]{2,}@\w{2,}$/.test(body.upi_id)) return (errBox.innerHTML = '<div class="err-box">Enter a valid UPI ID, like name@bank.</div>');
+
+  const btn = $('#pay-btn');
+  const label = btn.textContent;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Contacting your bank…';
+  try {
+    await sleep(1100); // make the "processing" moment visible on stage
+    await api(`/api/bookings/${encodeURIComponent(code)}/pay`, { method: 'POST', body });
+    state.justPaid = true;
+    location.hash = `#/ticket/${code}`;
+  } catch (err) {
+    btn.disabled = false; btn.textContent = label;
+    if (err.code === 'HOLD_EXPIRED') return route();
+    errBox.innerHTML = `<div class="err-box">${err.code === 'PAYMENT_DECLINED' ? '❌ ' : ''}${esc(err.network ? "Can't reach the backend." : err.message)}</div>`;
+  }
+}
+
+/* ───────────────────────────── view: ticket ───────────────────────────── */
+function barcodeSVG(code) {
+  let x = 6, bars = '';
+  const seq = (code + code).split('').map((c) => c.charCodeAt(0));
+  for (const n of seq) {
+    for (let i = 0; i < 4; i++) {
+      const w = ((n >> i) & 1) + 1;
+      if (i % 2 === 0) bars += `<rect x="${x}" y="0" width="${w}" height="60" fill="#111"/>`;
+      x += w + 1;
+    }
+  }
+  return `<svg class="barcode" viewBox="0 0 ${x + 6} 60" preserveAspectRatio="none" aria-hidden="true">${bars}</svg>`;
+}
+
+async function viewTicket(code, token) {
+  renderLoading('Loading your ticket…');
+  const { booking: b } = await api(`/api/bookings/${encodeURIComponent(code)}`);
+  if (stale(token)) return;
+  if (b.status === 'PENDING_PAYMENT') { location.hash = `#/pay/${b.code}`; return; }
+  await ensureMovies().catch(() => {});
+  if (stale(token)) return;
+  drawTicket(b);
+  if (state.justPaid && b.status === 'CONFIRMED') { state.justPaid = false; confetti(); }
+}
+
+function drawTicket(b) {
+  const ok = b.status === 'CONFIRMED';
+  const movie = state.movies.find((m) => m.id === b.show.movie_id) || { color1: '#7c3aed', color2: '#ec4899', emoji: '🎬', rating: '' };
+  app.innerHTML = `
+    <div class="wrap pad narrow">
+      <div class="ok-head">
+        ${ok ? `<div class="tick">✓</div><h1>You're going to the movies!</h1><p class="muted">Booking confirmed${b.source === 'agent' ? ' by the AI agent 🤖' : ''}. Show this ticket at the theatre.</p>`
+             : `<h1>Booking ${esc(STATUS[b.status]?.[1] ?? b.status).toLowerCase()}</h1><p class="muted">This ticket is no longer valid.</p>`}
+      </div>
+      <article class="ticket ${ok ? '' : 'cancelled'}">
+        <div class="ticket-main">
+          ${posterHTML({ ...movie, score: null, title: b.show.movie_title })}
+          <div>
+            <h1>${esc(b.show.movie_title)}</h1>
+            <div class="muted">${esc(b.show.theatre)}</div>
+            <div class="kv">
+              <div><small>Date</small><b>${fmtDate(b.show.date, true)}</b></div>
+              <div><small>Time</small><b>${fmtTime(b.show.time)}</b></div>
+              <div><small>Screen</small><b>${esc(b.show.screen)}</b></div>
+              <div><small>Seats</small><b>${b.seats.join(', ')}</b></div>
+              <div><small>Amount</small><b>${inr(b.amount)}</b></div>
+              <div><small>Status</small>${statusPill(b.status)}</div>
+              <div><small>Email</small><b style="font-size:14px">${esc(b.email)}</b></div>
+              <div><small>Phone</small><b style="font-size:14px">${esc(b.phone)}</b></div>
+            </div>
+          </div>
+        </div>
+        <div class="ticket-stub">
+          ${barcodeSVG(b.code)}
+          <div><small class="muted">BOOKING CODE</small><div class="code">${esc(b.code)}</div></div>
+          ${b.payment ? `<small class="muted">Paid via ${esc(b.payment.method)}<br>Ref ${esc(b.payment.reference)}</small>` : ''}
+        </div>
+      </article>
+      <div class="actions">
+        <a class="btn" href="#/">Book another movie</a>
+        <a class="btn ghost" href="#/bookings">My bookings</a>
+        ${ok ? `<button class="btn danger" data-action="cancel-booking" data-code="${esc(b.code)}">Cancel booking</button>` : ''}
+      </div>
+    </div>`;
+}
+
+/* ───────────────────────────── view: my bookings ───────────────────────────── */
+async function viewBookings(_, token) {
+  const email = store.get('tt_email') || '';
+  app.innerHTML = `
+    <div class="wrap pad narrow">
+      <h1 style="font-size:32px;margin-bottom:6px">My bookings</h1>
+      <p class="muted">Look up bookings by email. That includes the ones the AI assistant made for you.</p>
+      <form class="card" id="lookup-form" style="display:flex;gap:12px;flex-wrap:wrap;margin:18px 0" novalidate>
+        <input class="input" id="lookup-email" type="email" placeholder="you@example.com" value="${esc(email)}" style="flex:1;min-width:220px">
+        <button class="btn" type="submit">Find bookings</button>
+      </form>
+      <div id="bookings-list"></div>
+    </div>`;
+  if (email) await loadBookings(email, token);
+}
+
+async function loadBookings(email, token = state.token) {
+  const box = $('#bookings-list');
+  if (!box) return;
+  box.innerHTML = '<div class="center"><div class="spinner"></div></div>';
+  const { bookings } = await api(`/api/bookings?email=${encodeURIComponent(email)}`);
+  if (stale(token) || !$('#bookings-list')) return;
+  box.innerHTML = bookings.length ? bookings.map((b) => `
+    <div class="card bk">
+      <div class="info">
+        <h3>${esc(b.show.movie_title)} ${b.source === 'agent' ? '<span class="pill dim">🤖 via agent</span>' : ''}</h3>
+        <div class="muted">${esc(b.show.theatre)} · ${fmtDate(b.show.date)} · ${fmtTime(b.show.time)}</div>
+        <div class="muted">Seats ${b.seats.join(', ')} · ${inr(b.amount)} · <b>${esc(b.code)}</b></div>
+      </div>
+      ${statusPill(b.status)}
+      <div style="display:flex;gap:8px">
+        ${b.status === 'CONFIRMED' ? `<a class="btn ghost" href="#/ticket/${b.code}">View ticket</a>` : ''}
+        ${b.status === 'PENDING_PAYMENT' ? `<a class="btn" href="#/pay/${b.code}">Pay now</a>` : ''}
+        ${['CONFIRMED', 'PENDING_PAYMENT'].includes(b.status) ? `<button class="btn danger" data-action="cancel-booking" data-code="${esc(b.code)}">Cancel</button>` : ''}
+      </div>
+    </div>`).join('') : '<div class="card center">No bookings found for this email yet.</div>';
+}
+
+/* ───────────────────────────── search box ───────────────────────────── */
+let searchSel = -1;
+function drawSearch() {
+  const box = $('#search-results');
+  const q = $('#search').value.trim().toLowerCase();
+  if (!q) { box.classList.add('hidden'); return; }
+  const hits = state.movies.filter((m) => m.title.toLowerCase().includes(q) || m.genres.some((g) => g.toLowerCase().includes(q))).slice(0, 6);
+  searchSel = hits.length ? 0 : -1;
+  box.innerHTML = hits.length ? hits.map((m, i) => `
+    <button class="sr ${i === 0 ? 'on' : ''}" data-action="go" data-href="#/movie/${m.id}">
+      ${posterHTML({ ...m, score: null })}<span><b>${esc(m.title)}</b><small>${esc(m.genres.slice(0, 2).join(' / '))} · ${esc(m.language)}</small></span>
+    </button>`).join('') : '<div class="sr-empty">No movies found</div>';
+  box.classList.remove('hidden');
+}
+const closeSearch = () => { $('#search-results').classList.add('hidden'); };
+
+/* ───────────────────────────── live updates (SSE) ───────────────────────────── */
+let eventSource = null;
+const LIVE_TYPES = ['booking.created', 'booking.confirmed', 'booking.cancelled', 'booking.expired', 'reset'];
+
+function setLive(on) {
+  const changed = state.live !== on;
+  state.live = on;
+  $('#live-pill').classList.toggle('live-on', on);
+  $('#live-label').textContent = on ? 'Live' : 'Reconnecting…';
+  return changed;
+}
+
+// How live updates reach the page (first one that works wins):
+//   1. EventSource    - the normal way
+//   2. fetch stream   - same events, but can send headers (ngrok needs one)
+//   3. polling        - every 2s; for tunnels/proxies that buffer streams (Cloudflare quick tunnels do)
+// Add ?sse=fetch or ?sse=off to the page URL to force 2 or 3 when testing.
+const forceMode = () => new URLSearchParams(location.search).get('sse');
+const useFetchStream = () => /ngrok/i.test(apiBase()) || forceMode() === 'fetch';
+let liveAbort = null, pollAbort = null, pollFallbackTimer = null;
+
+function stopPolling() { pollAbort?.abort(); pollAbort = null; }
+
+function connectLive() {
+  eventSource?.close();
+  liveAbort?.abort();
+  stopPolling();
+  clearTimeout(pollFallbackTimer);
+  setLive(false);
+  if (forceMode() === 'off') { startPolling(); return; }
+  // If the stream doesn't say hello quickly, something is buffering it: fall back to polling.
+  pollFallbackTimer = setTimeout(() => { if (!state.live) startPolling(); }, 4000);
+  if (useFetchStream()) { connectLiveFetch(); return; }
+  try { eventSource = new EventSource(apiBase() + '/api/events'); } catch { return; }
+  eventSource.addEventListener('hello', onStreamHello);
+  eventSource.onerror = () => { if (!pollAbort) setLive(false); }; // the browser retries on its own
+  LIVE_TYPES.forEach((t) => eventSource.addEventListener(t, (ev) => onLiveEvent(t, JSON.parse(ev.data))));
+}
+
+function onStreamHello() {
+  stopPolling(); // the stream works, so we don't need to poll
+  $('#live-pill').title = 'Live booking activity';
+  if (setLive(true)) refreshCurrentView();
+}
+
+function handleStreamBlock(block) {
+  let type = 'message', data = '';
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) type = line.slice(6).trim();
+    else if (line.startsWith('data:')) data += line.slice(5).trim();
+  }
+  if (type === 'hello') onStreamHello();
+  else if (LIVE_TYPES.includes(type) && data) onLiveEvent(type, JSON.parse(data));
+}
+
+async function connectLiveFetch() {
+  const ctrl = new AbortController();
+  liveAbort = ctrl;
+  while (!ctrl.signal.aborted) {
+    try {
+      const res = await fetch(apiBase() + '/api/events', { headers: { ...extraHeaders(), Accept: 'text/event-stream' }, signal: ctrl.signal });
+      if (!res.ok || !res.body) throw new Error(`stream HTTP ${res.status}`);
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += value.replace(/\r\n/g, '\n');
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) { handleStreamBlock(buf.slice(0, i)); buf = buf.slice(i + 2); }
+      }
+    } catch (err) { if (ctrl.signal.aborted) return; }
+    if (!pollAbort) setLive(false);
+    await sleep(2000); // then reconnect
+  }
+}
+
+async function startPolling() {
+  if (pollAbort) return;
+  const ctrl = new AbortController();
+  pollAbort = ctrl;
+  let since = null; // the first call only learns the server's current position
+  while (!ctrl.signal.aborted) {
+    try {
+      const r = await api(`/api/events/poll${since === null ? '' : `?since=${since}`}`);
+      if (ctrl.signal.aborted) return;
+      if (since !== null) {
+        if (r.reset) refreshCurrentView(); // the server restarted; re-sync what's on screen
+        else for (const ev of r.events) onLiveEvent(ev.type, ev);
+      }
+      since = r.last;
+      $('#live-pill').title = 'Live booking activity (updating every 2 seconds)';
+      if (setLive(true)) refreshCurrentView();
+    } catch { if (!ctrl.signal.aborted) setLive(false); }
+    await sleep(2000);
+  }
+}
+// Safety net: if we've been offline for a while and nothing is polling, start.
+setInterval(() => { if (!state.live && !pollAbort && forceMode() !== 'fetch') startPolling(); }, 8000);
+
+function refreshCurrentView() {
+  const v = state.view.name;
+  if (v === 'show') refreshSeats().catch(() => {});
+  else if (v === 'book') refreshShowtimes().catch(() => {});
+}
+
+const VERBS = { 'booking.created': 'is holding', 'booking.confirmed': 'booked', 'booking.cancelled': 'cancelled', 'booking.expired': 'let a hold expire on' };
+const feedLine = (type, b) => {
+  const who = b.source === 'agent' ? '🤖 AI agent' : '🌐 Website';
+  return { who, text: `${VERBS[type]} <b>${esc(b.seats.join(', '))}</b> for ${esc(b.show.movie_title)} · ${fmtTime(b.show.time)}` };
+};
+
+const seenEvents = new Set();
+
+// One card per booking: a later event (held -> paid -> cancelled) updates the card and moves it to the top.
+function addToFeed(type, b, at) {
+  const i = state.feed.findIndex((f) => f.b.code === b.code);
+  const history = i >= 0 ? state.feed.splice(i, 1)[0].history : [];
+  history.push({ type, at });
+  state.feed.unshift({ type, b, at, history });
+  state.feed.length = Math.min(state.feed.length, 30);
+}
+
+let showtimeRefreshTimer;
+function onLiveEvent(type, data) {
+  if (type === 'reset') {
+    state.feed = []; renderFeed(); toast('🧹 Demo bookings were reset.');
+    refreshCurrentView(); if (state.view.name === 'bookings') route();
+    return;
+  }
+  const b = data.booking;
+  // The same event can arrive twice (e.g. when live updates hand over between streaming and polling).
+  const key = `${data.at}-${data.seq}`;
+  if (seenEvents.has(key)) return;
+  seenEvents.add(key);
+  if (seenEvents.size > 300) seenEvents.delete(seenEvents.values().next().value);
+  addToFeed(type, b, data.at);
+  if (!state.drawerOpen) { state.unread++; updateBadge(); }
+  renderFeed();
+
+  const mine = b.source === 'web' && (state.myCodes.has(b.code) || (state.creating && type === 'booking.created'));
+  if (!mine && type !== 'booking.expired') {
+    const line = feedLine(type, b);
+    toast(`${esc(line.who)} ${line.text}`, b.source === 'agent' ? 'agent' : '');
+  }
+
+  const v = state.view;
+  if (v.name === 'show' && state.show && b.show.id === state.show.id) refreshSeats().catch(() => {});
+  if (v.name === 'book' && state.movie && b.show.movie_id === state.movie.id) {
+    clearTimeout(showtimeRefreshTimer);
+    showtimeRefreshTimer = setTimeout(() => refreshShowtimes().catch(() => {}), 350);
+  }
+  if (v.name === 'pay' && v.arg === b.code && type === 'booking.confirmed') location.hash = `#/ticket/${b.code}`;
+  else if (v.name === 'pay' && v.arg === b.code && ['booking.cancelled', 'booking.expired'].includes(type)) route();
+  if (v.name === 'ticket' && v.arg === b.code) route();
+  if (v.name === 'bookings' && $('#lookup-email')?.value.trim().toLowerCase() && !mine) {
+    loadBookings($('#lookup-email').value.trim().toLowerCase()).catch(() => {});
+  }
+}
+
+function renderFeed() {
+  const STEP = { 'booking.created': 'Held', 'booking.confirmed': 'Paid', 'booking.cancelled': 'Cancelled', 'booking.expired': 'Hold expired' };
+  $('#feed').innerHTML = state.feed.length ? state.feed.map(({ type, b, at, history }) => {
+    const line = feedLine(type, b);
+    const trail = history.length > 1 ? history.map((h) => `${STEP[h.type]} ${ago(h.at)}`).join(' → ') : '';
+    return `<li class="${b.source === 'agent' ? 'agent' : ''}">
+      <div class="top"><span class="who">${esc(line.who)}</span><span>${ago(at)}</span></div>
+      <div class="what">${line.text}</div>
+      ${trail ? `<div class="hint" style="margin-top:2px">${esc(trail)}</div>` : ''}
+      <div class="hint" style="margin-top:4px">${esc(b.show.theatre)} · ${inr(b.amount)} · <b>${esc(b.code)}</b> · ${esc(b.email_masked)}</div>
+    </li>`;
+  }).join('') : '<li class="feed-empty" style="border:0;background:none">No activity yet.<br>Book a seat, or ask the AI agent to, and it will show up here instantly.</li>';
+}
+
+function updateBadge() {
+  const el = $('#live-count');
+  el.textContent = state.unread;
+  el.classList.toggle('hidden', state.unread === 0);
+}
+
+async function loadActivity() {
+  try {
+    const { activity } = await api('/api/activity');
+    const typeOf = { CONFIRMED: 'booking.confirmed', PENDING_PAYMENT: 'booking.created', CANCELLED: 'booking.cancelled', EXPIRED: 'booking.expired' };
+    state.feed = activity.map((b) => ({ type: typeOf[b.status], b, at: new Date(b.created_at).getTime(), history: [{ type: typeOf[b.status], at: new Date(b.created_at).getTime() }] }));
+  } catch { /* backend may be down; the main view shows the error */ }
+  renderFeed();
+}
+
+/* ───────────────────────────── modals ───────────────────────────── */
+function openSettings() {
+  $('#modal-root').innerHTML = `
+    <div class="modal-bg" data-action="close-modal">
+      <div class="card modal">
+        <h3>Backend settings</h3>
+        <p class="muted" style="margin-top:0">Where is the TicketTown API running? Saved in this browser only.</p>
+        <div class="field"><label for="api-url">API base URL</label>
+          <input class="input" id="api-url" value="${esc(apiBase())}" placeholder="https://your-backend.example.com"></div>
+        <div id="api-test" class="hint" style="margin-bottom:14px"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" data-action="save-settings">Save &amp; reload</button>
+          <button class="btn ghost" data-action="test-settings">Test connection</button>
+          <button class="btn ghost" data-action="close-modal">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+  $('#api-url').focus();
+}
+const closeModal = () => { $('#modal-root').innerHTML = ''; };
+
+function openTrailer(key) {
+  // YouTube is only contacted when someone presses the button.
+  $('#modal-root').innerHTML = `
+    <div class="modal-bg" data-action="close-modal">
+      <div class="card modal video"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(key)}?autoplay=1&rel=0" title="Trailer" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe></div>
+    </div>`;
+}
+
+/* ───────────────────────────── events: clicks, forms, inputs ───────────────────────────── */
+const actions = {
+  go: (el) => { closeSearch(); go(el.dataset.href); },
+  retry: () => route(),
+  lang: (el) => { state.lang = el.dataset.v; drawHome(); startHero(); },
+  genre: (el) => { state.genre = el.dataset.v; drawHome(); startHero(); },
+  'see-all': () => $('#all-movies')?.scrollIntoView({ behavior: 'smooth' }),
+  rail: (el) => $('#rail').scrollBy({ left: Number(el.dataset.dir) * 440, behavior: 'smooth' }),
+  'hero-prev': () => state.heroShow?.(heroIdx - 1),
+  'hero-next': () => state.heroShow?.(heroIdx + 1),
+  'hero-go': (el) => state.heroShow?.(Number(el.dataset.i)),
+  'pick-date': (el) => { state.date = el.dataset.date; drawBook(); },
+  'pick-tod': (el) => { state.tod = el.dataset.v; drawBook(); },
+  trailer: (el) => openTrailer(el.dataset.key),
+  'toggle-seat': (el) => {
+    const seat = el.dataset.seat;
+    if (state.selected.has(seat)) state.selected.delete(seat);
+    else if (state.selected.size >= MAX_SEATS) return toast(`You can book up to ${MAX_SEATS} seats at a time.`, 'bad');
+    else state.selected.add(seat);
+    redrawSeats();
+  },
+  suggest: async (el) => {
+    try {
+      const r = await api(`/api/shows/${state.show.id}/suggest?count=${el.dataset.count}`);
+      state.selected = new Set(r.seats);
+      redrawSeats();
+      if (!r.together) toast('No block that big is free, so we picked the best individual seats.');
+    } catch (err) { toast(esc(err.message), 'bad'); }
+  },
+  continue: () => { if (state.selected.size) location.hash = '#/details'; },
+  'pay-tab': (el) => {
+    state.payMethod = el.dataset.method;
+    $$('.tab').forEach((t) => t.classList.toggle('on', t.dataset.method === state.payMethod));
+    $$('[data-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== state.payMethod));
+  },
+  'use-test-card': () => {
+    if (state.payMethod !== 'card') actions['pay-tab']({ dataset: { method: 'card' } });
+    $('#card').value = '4242 4242 4242 4242'; $('#exp').value = '12/34'; $('#cvv').value = '123';
+  },
+  'cancel-hold': async (el) => {
+    if (!confirm('Release these seats and cancel this booking?')) return;
+    try { await api(`/api/bookings/${el.dataset.code}/cancel`, { method: 'POST' }); location.hash = '#/'; } catch (err) { toast(esc(err.message), 'bad'); }
+  },
+  'cancel-booking': async (el) => {
+    if (!confirm('Cancel this booking? The seats will be released.')) return;
+    try {
+      const r = await api(`/api/bookings/${el.dataset.code}/cancel`, { method: 'POST' });
+      toast(r.refund_amount ? `Cancelled. ${inr(r.refund_amount)} will be refunded (demo).` : 'Booking cancelled.');
+      route();
+    } catch (err) { toast(esc(err.message), 'bad'); }
+  },
+  'open-live': () => { state.drawerOpen = true; state.unread = 0; updateBadge(); renderFeed(); $('#drawer').classList.add('open'); },
+  'close-live': () => { state.drawerOpen = false; $('#drawer').classList.remove('open'); },
+  'open-settings': openSettings,
+  'close-modal': closeModal,
+  'save-settings': () => {
+    const url = $('#api-url').value.trim().replace(/\/+$/, '');
+    if (url) store.set('tt_api_base', url);
+    location.reload();
+  },
+  'test-settings': async () => {
+    const box = $('#api-test');
+    box.textContent = 'Testing…';
+    try {
+      const testUrl = $('#api-url').value.trim().replace(/\/+$/, '');
+      const r = await fetch(testUrl + '/api/health', { headers: /ngrok/i.test(testUrl) ? { 'ngrok-skip-browser-warning': '1' } : undefined });
+      const j = await r.json();
+      box.innerHTML = j.ok ? '✅ Connected. The backend is healthy.' : '⚠️ Reached the server but it did not look like TicketTown.';
+    } catch { box.innerHTML = '❌ Could not connect. Check the URL, that the server is running, and https vs http.'; }
+  },
+};
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search')) closeSearch();
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  // clicking inside a modal card must not trigger the backdrop's close action
+  if (el.classList.contains('modal-bg') && e.target !== el) return;
+  actions[el.dataset.action]?.(el, e);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeModal(); closeSearch(); actions['close-live'](); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('slide')) { e.preventDefault(); go(e.target.dataset.href); }
+  if (e.target.id === 'search') {
+    const items = $$('.sr');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!items.length) return;
+      searchSel = (searchSel + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items.forEach((it, i) => it.classList.toggle('on', i === searchSel));
+    } else if (e.key === 'Enter' && items[searchSel]) { e.preventDefault(); items[searchSel].click(); $('#search').blur(); }
+  }
+});
+
+document.addEventListener('submit', (e) => {
+  const f = e.target;
+  if (f.id === 'details-form') { e.preventDefault(); submitDetails(f); }
+  else if (f.id === 'pay-form') { e.preventDefault(); submitPayment(f); }
+  else if (f.id === 'lookup-form') {
+    e.preventDefault();
+    const email = $('#lookup-email').value.trim().toLowerCase();
+    if (!email) return;
+    store.set('tt_email', email);
+    loadBookings(email).catch((err) => { $('#bookings-list').innerHTML = `<div class="err-box">${esc(err.message)}</div>`; });
+  }
+});
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'search') { ensureMovies().then(drawSearch).catch(() => {}); return; }
+  const kind = e.target.dataset?.format;
+  if (!kind) return;
+  let v = e.target.value.replace(/\D/g, '');
+  if (kind === 'card') v = v.slice(0, 19).replace(/(.{4})/g, '$1 ').trim();
+  if (kind === 'exp') v = v.slice(0, 4).replace(/^(\d{2})(\d)/, '$1/$2');
+  if (kind === 'cvv') v = v.slice(0, 4);
+  e.target.value = v;
+});
+$('#search').addEventListener('focus', () => { if ($('#search').value.trim()) ensureMovies().then(drawSearch).catch(() => {}); });
+
+/* ───────────────────────────── boot ───────────────────────────── */
+$('#logo-slot').innerHTML = LOGO_SVG;
+$('link[rel="icon"]').href = 'data:image/svg+xml,' + encodeURIComponent(LOGO_SVG);
+$('#footer-api').textContent = 'API: ' + apiBase();
+renderFeed();
+loadActivity();
+connectLive();
+route();
+</script>
+
+<!-- ═══════════════════════ watsonx Orchestrate embedded chat ═══════════════════════
+     Paste the embed snippet from Orchestrate here (the <script> that sets
+     window.wxOConfiguration and loads wxoLoader.js). The chat launcher appears
+     bottom-right. Then set SHOW_AGENT_HINT = true near the top of this file.
+     ═══════════════════════════════════════════════════════════════════════════════ -->
+
+</body>
+</html>

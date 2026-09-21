@@ -1,0 +1,17 @@
+# One-click deploy of the backend on Render: New + > Blueprint > pick this repo.
+services:
+  - type: web
+    name: tickettown-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ADMIN_KEY          # needed for POST /api/admin/reset
+        generateValue: true
+      - key: HOLD_MINUTES
+        value: "10"

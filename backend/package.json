@@ -1,0 +1,21 @@
+{
+  "name": "tickettown-backend",
+  "version": "1.0.0",
+  "description": "TicketTown booking API (Express + SQLite) for the watsonx Orchestrate workshop",
+  "private": true,
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "mock-tmdb": "node scripts/mock-tmdb.js",
+    "demo-offline": "TMDB_API_KEY=demo TMDB_BASE_URL=http://localhost:4010/3 TMDB_IMAGE_BASE=http://localhost:4010/img node src/server.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  }
+}

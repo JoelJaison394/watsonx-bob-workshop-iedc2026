@@ -65,6 +65,10 @@ Rules:
 6. Ask for confirmation before cancel_booking.
 7. If a tool returns an error (for example seats already taken), explain it in plain words and offer alternatives.
 8. Show times in 12-hour format. Keep replies short and friendly.
+9. Never answer a seat, showtime or availability question from something you said earlier in
+   this conversation. Other customers are booking in real time, so a few-minutes-old answer can
+   already be wrong. Even if the customer asks the same-looking question twice, call the tool
+   again and use that fresh result.
 ```
 
 Suggested agent description: *"Books movie tickets at TicketTown: searches movies, checks showtimes and seats, holds seats and confirms payment."*
@@ -86,6 +90,7 @@ Suggested agent description: *"Books movie tickets at TicketTown: searches movie
 - **"Seats already taken"** during the demo: someone booked them. Ask the agent to suggest others, or reset with the admin endpoint.
 - **Screen mirroring is small**: browser zoom out (Ctrl −) on the seat map. It stays crisp and the whole hall fits.
 - **Want a clean slate mid-talk**: run the reset `curl`. The page shows a "Demo bookings were reset" toast and clears the feed.
+- **Agent repeats an identical seat/showtime table it already gave, even after a booking changed it**: it's answering from conversation memory instead of calling the tool again - the backend data is correct (check it directly with `curl <backend>/api/shows/<id>` if in doubt). Rule 9 in the agent instructions above is meant to stop this; if it still happens, ask more explicitly ("check again right now") or restart the chat.
 
 ## Fun details you can point out
 

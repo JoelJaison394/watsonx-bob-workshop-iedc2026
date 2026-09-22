@@ -56,7 +56,12 @@ mcp = FastMCP(
         "get_showtimes) -> suggest_seats (or get_seat_map for specific seats) -> create_booking "
         "-> confirm_payment. Always confirm the movie, showtime, seats, price and the "
         "customer's email and phone before create_booking, and get an explicit yes before "
-        "confirm_payment."
+        "confirm_payment.\n"
+        "IMPORTANT - never answer a seat, showtime or availability question from something you "
+        "said earlier in this conversation. Other customers are booking in real time, so a "
+        "5-minute-old answer can already be wrong. Every time the customer asks about seats, "
+        "showtimes or availability - even if it looks like the same question as before - call "
+        "the tool again and use that fresh result, never a cached or remembered one."
     ),
 )
 
@@ -226,7 +231,8 @@ async def get_showtimes_for_movie(
     If the movie is currently showing, returns currently_showing=true plus its showtimes (same shape as get_showtimes).
     If it isn't currently showing, returns currently_showing=false and a next_step telling you to call find_any_movie -
     do that instead of telling the customer it doesn't exist. If the title matches more than one movie currently
-    showing, returns ambiguous=true with candidates instead of guessing - ask the customer which one they mean."""
+    showing, returns ambiguous=true with candidates instead of guessing - ask the customer which one they mean.
+    Seats and prices change constantly as other customers book - never reuse an earlier answer, call this fresh every time."""
     movies = (await _call("GET", "/api/movies"))["movies"]
     match, ambiguous = _best_title_match(movies, title)
     if ambiguous:
@@ -269,7 +275,8 @@ async def get_showtimes(
     date: Annotated[str | None, Field(description="'today', 'tomorrow' or a YYYY-MM-DD date. Leave empty for all upcoming shows.")] = None,
 ) -> list[dict]:
     """List upcoming showtimes for a movie: theatre, screen, date, 24-hour time, seat prices in INR (three tiers: Silver, Gold, Platinum) and how many seats are still free.
-    Returns each show's show_id, which is needed to pick seats and book. Shows that already started are never returned."""
+    Returns each show's show_id, which is needed to pick seats and book. Shows that already started are never returned.
+    seats_available changes as other customers book - never reuse an earlier answer, call this fresh every time."""
     params: dict = {"movie_id": movie_id}
     if date:
         params["date"] = date
@@ -316,7 +323,9 @@ async def get_seat_map(
     show_id: Annotated[int, Field(description="Show id from get_showtimes.")],
 ) -> dict:
     """Show which seats are free for one show, grouped by row, plus the price of each tier. Rows are lettered from A (nearest the screen) and seats are numbered from 1.
-    Use this when the user asks for specific seats, e.g. 'row F, seats 5 and 6'."""
+    Use this when the user asks for specific seats, e.g. 'row F, seats 5 and 6'.
+    This changes constantly as other customers book - never reuse an earlier answer, call this fresh every time,
+    even if you just called it a moment ago for the same show."""
     r = await _call("GET", f"/api/shows/{show_id}")
     show, seats = r["show"], r["seats"]
     unavailable = set(seats["booked"]) | set(seats["held"])

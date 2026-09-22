@@ -210,6 +210,8 @@ cd mcp
 python test_client.py     # quick smoke test: one booking, start to finish
 python test_tools.py      # thorough: 159 checks across all 11 tools, incl. discovering and
                            # booking a movie that isn't in the current line-up
+python simulate_agent.py  # a readable, human transcript of a real customer conversation -
+                           # good for a sanity check or a screen-share, not for CI
 ```
 
 `test_tools.py` connects like a real MCP client and checks the tool list and schemas, every tool's success and failure paths, tier pricing, that a rejected booking holds nothing, and that the agent's actions produce live events for the website. It also checks the HTTP transport and what the agent sees when the backend is down. It cancels what it books. Use `TICKETTOWN_API_URL=<address>` to test through a tunnel.

@@ -155,7 +155,6 @@ async def test_browse(session):
 
 async def test_discover_and_activate(session, movies):
     section("3. find_any_movie -> add_movie_to_lineup (booking a title that isn't currently listed)")
-    active_ids = {m["movie_id"] for m in movies}
     r = await call(session, "find_any_movie", title="The Godfather")
     check("finds a well-known movie that predates any current release window", r.ok and len(r.data) >= 1, r.error or "")
     if not r.ok or not r.data:
@@ -163,13 +162,18 @@ async def test_discover_and_activate(session, movies):
     candidates = r.data
     check("each result has what's needed to confirm + activate it", all({"tmdb_id", "title", "year", "language"} <= set(c) for c in candidates))
     pick = next((c for c in candidates if c["title"] == "The Godfather"), candidates[0])
-    check("the classic isn't already sitting in the current line-up", pick["tmdb_id"] not in {m.get("tmdb_id") for m in movies} | set())
+    # browse_now_showing doesn't expose tmdb_id (an agent has no business seeing internal ids
+    # for movies it hasn't looked up), so the only signal available for "already listed" is the
+    # title. Good enough here: derive the expectation from it rather than assuming a fresh
+    # database, since re-running this suite against a long-lived dev backend is the normal case.
+    already_listed_by_title = any(m["title"] == pick["title"] for m in movies)
 
     added = await call(session, "add_movie_to_lineup", tmdb_id=pick["tmdb_id"])
     check("adds it with showtimes ready to book", added.ok and added.data["showtimes"], added.error or "")
     if not added.ok:
         return None
-    check("it's brand new this call (not already in the lineup)", added.data["was_already_in_lineup"] is False)
+    check(f"was_already_in_lineup correctly reflects prior state (expected {already_listed_by_title})",
+          added.data["was_already_in_lineup"] is already_listed_by_title, str(added.data["was_already_in_lineup"]))
     new_movie_id = added.data["movie_id"]
 
     again = await call(session, "add_movie_to_lineup", tmdb_id=pick["tmdb_id"])

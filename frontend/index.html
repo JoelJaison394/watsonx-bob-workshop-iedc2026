@@ -1546,6 +1546,22 @@ renderFeed();
 loadActivity();
 connectLive();
 route();
+
+// Some hosts (e.g. Netlify's free tier) inject their own "Powered by" badge into the page via
+// an async script well after load. It actually renders inside its own <iframe id="nl-badge-frame">
+// (not a plain <div> in our DOM), so hiding the button inside it doesn't work - we hide the
+// iframe itself, from the outside. It's added late, so watch for it rather than assume it's there.
+(function hideHostBadge() {
+  const kill = (el) => el.style.setProperty('display', 'none', 'important');
+  const existing = document.getElementById('nl-badge-frame');
+  if (existing) return kill(existing);
+  const observer = new MutationObserver(() => {
+    const el = document.getElementById('nl-badge-frame');
+    if (el) { kill(el); observer.disconnect(); }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(() => observer.disconnect(), 20000); // give up quietly if it never shows
+})();
 </script>
 
 <!-- ═══════════════════════ watsonx Orchestrate embedded chat ═══════════════════════

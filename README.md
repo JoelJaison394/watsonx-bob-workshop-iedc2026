@@ -25,6 +25,15 @@ The speaker guide with demo script, agent instructions and sample prompts is in 
 
 ---
 
+## 🚀 Deployed OpenShift (OCP) Endpoints
+
+- **Backend API:** <https://workshop-backend.apps.wo-dp-005.p75g.p1.openshiftapps.com>
+  - Health endpoint: `https://workshop-backend.apps.wo-dp-005.p75g.p1.openshiftapps.com/api/health`
+- **MCP Server (Streamable HTTP):** <https://workshop-mcp.apps.wo-dp-005.p75g.p1.openshiftapps.com>
+  - MCP endpoint: `https://workshop-mcp.apps.wo-dp-005.p75g.p1.openshiftapps.com/mcp`
+
+---
+
 ## Run everything locally
 
 Needs **Node 22.13+** and Python 3.10+.

@@ -271,4 +271,7 @@ if __name__ == "__main__":
         mcp.run(transport="stdio")
     else:
         mcp.settings.host, mcp.settings.port = args.host, args.port
+        mcp.settings.transport_security.enable_dns_rebinding_protection = False
+        mcp.settings.transport_security.allowed_hosts = ["*"]
+        mcp.settings.transport_security.allowed_origins = ["*"]
         mcp.run(transport="streamable-http" if args.transport == "http" else "sse")

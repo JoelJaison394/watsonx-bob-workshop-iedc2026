@@ -4,3 +4,5 @@ backend/data/
 __pycache__/
 *.log
 .env
+deployment.md
+ocp/

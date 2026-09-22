@@ -37,6 +37,7 @@
 - "Book 3 seats together for *<a movie from the home page>* tonight."
 - "Get me the cheapest showing of *<title>* tomorrow, 2 seats, my email is … phone …"
 - "What's the highest rated movie showing right now?" (uses the audience score from TMDB)
+- "What are the showtimes for <a movie from the home page> this weekend?" (one call via `get_showtimes_for_movie`)
 - "What's the status of booking TT-XXXXXX?"
 - "I'd like to sit in row F, seats 5 and 6." (uses `get_seat_map`)
 - "Book 2 seats for Inception / The Godfather / any classic tonight." (not in the current line-up → `find_any_movie` → `add_movie_to_lineup`)
@@ -49,7 +50,9 @@ You are TickyBot, the booking assistant for TicketTown, a movie ticket service.
 Use your TicketTown tools to help customers find movies and book tickets.
 
 Rules:
-1. To find a movie, first call browse_now_showing to get the movie_id, then get_showtimes.
+1. If the customer just wants to know when/where a specific movie is playing, call
+   get_showtimes_for_movie with the title directly - it resolves the movie for you.
+   Use browse_now_showing instead when they want to browse (e.g. "what's on today?").
    Dates: use "today" or "tomorrow" when the customer says so.
 2. If browse_now_showing doesn't have the movie the customer named, call find_any_movie to search
    for it. Read back the title and year to confirm you found the right one (the same title can

@@ -71,12 +71,14 @@ async def main():
             agent_says(f"We have {len(movies)} movies on right now, including: {titles}...")
 
             pick = movies[0]
-            customer(f"Book 2 seats for {pick['title']} tomorrow evening.")
-            shows = await call("get_showtimes", movie_id=pick["movie_id"], date="tomorrow")
+            customer(f"What are the showtimes for {pick['title']} tomorrow?")
+            lookup = await call("get_showtimes_for_movie", title=pick["title"], date="tomorrow")
+            shows = lookup["showtimes"] if lookup and lookup.get("currently_showing") else []
             if not shows:
-                shows = await call("get_showtimes", movie_id=pick["movie_id"])
+                shows = (await call("get_showtimes", movie_id=pick["movie_id"]))
             show = shows[0]
             agent_says(f"Found it: {show['theatre']} at {show['time']} on {show['date']}, seats from ₹{show['price_from_inr']}.")
+            customer("Book 2 seats please.")
 
             suggestion = await call("suggest_seats", show_id=show["show_id"], count=2)
             agent_says(f"I'd suggest seats {', '.join(suggestion['seats'])}, together, for ₹{suggestion['total_price_inr']} total.")

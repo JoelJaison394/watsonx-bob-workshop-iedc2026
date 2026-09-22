@@ -6,7 +6,7 @@ A small movie-booking app built for the **watsonx Orchestrate workshop**. Attend
 ┌──────────────┐   REST + SSE    ┌───────────────────┐   REST    ┌──────────────┐
 │  frontend/   │ ──────────────▶ │     backend/      │ ◀──────── │    mcp/      │
 │  index.html  │ ◀── live feed ─ │ Node + Express    │           │ Python FastMCP│
-│  (Replit)    │                 │ + SQLite          │           │ 11 tools     │
+│  (Replit)    │                 │ + SQLite          │           │ 12 tools     │
 └──────────────┘                 └───────────────────┘           └──────┬───────┘
                                                                         │ MCP
                                                               ┌─────────▼────────┐
@@ -191,6 +191,7 @@ Movie discovery is two-tier, matching how the site itself works:
 - **`browse_now_showing`** - only what's actually listed and bookable right now. The backend curates this for the workshop's mostly-Malayalam audience: it reserves several slots for trending Malayalam releases from this month, then fills the rest with trending English and other Indian-language titles (Tamil, Telugu, Hindi, ...) so it's never Malayalam-only and never empty if a month happens to have no new Malayalam release. See `TMDB_LIMIT` / the curation logic in [`backend/src/tmdb.js`](backend/src/tmdb.js).
 - **`find_any_movie`** - searches *all* of TMDB, for a title that isn't in `browse_now_showing` (an older release, or one outside this month's curated pull). Read-only; returns candidates to confirm, nothing is booked or added yet.
 - **`add_movie_to_lineup`** - brings a movie found via `find_any_movie` onto the live site: adds it to the database and generates real showtimes for it immediately, in sync with the frontend - anyone watching the home page sees it appear live. Idempotent. A movie added this way is never silently removed by the periodic TMDB re-sync while a real (non-seed) booking exists for it.
+- **`get_showtimes_for_movie`** - "what are the showtimes for *X*?" in one call, instead of `browse_now_showing` + `get_showtimes`. Resolves the title itself; if it isn't currently showing it says so and points at `find_any_movie` instead of a dead end, and if the title matches more than one current movie it returns candidates rather than guessing.
 
 Booking, same as before: `get_showtimes` · `suggest_seats` · `get_seat_map` · `create_booking` · `confirm_payment` · `get_booking` · `list_bookings` · `cancel_booking`
 

@@ -31,12 +31,12 @@ EXPIRY_API = os.environ.get("EXPIRY_API_URL", "").rstrip("/")
 
 EXPECTED_TOOLS = {
     "browse_now_showing": [], "find_any_movie": ["title"], "add_movie_to_lineup": ["tmdb_id"],
-    "get_showtimes": ["movie_id"], "suggest_seats": ["show_id", "count"],
+    "get_showtimes_for_movie": ["title"], "get_showtimes": ["movie_id"], "suggest_seats": ["show_id", "count"],
     "get_seat_map": ["show_id"], "create_booking": ["show_id", "seats", "email", "phone"],
     "confirm_payment": ["booking_code"], "get_booking": ["booking_code"],
     "list_bookings": ["email"], "cancel_booking": ["booking_code"],
 }
-READ_ONLY = {"browse_now_showing", "find_any_movie", "get_showtimes", "suggest_seats", "get_seat_map", "get_booking", "list_bookings"}
+READ_ONLY = {"browse_now_showing", "find_any_movie", "get_showtimes_for_movie", "get_showtimes", "suggest_seats", "get_seat_map", "get_booking", "list_bookings"}
 
 results: list[tuple[str, bool]] = []
 active_codes: set[str] = set()  # bookings we made and haven't cancelled; cleaned up at the end
@@ -202,6 +202,39 @@ async def test_book_discovered_movie(session, show_id):
     c = await call(session, "cancel_booking", booking_code=b.data["booking_code"])
     check("...and cancelled, same as any other booking", c.ok, c.error or "")
     active_codes.discard(b.data["booking_code"])
+
+
+async def test_showtimes_for_movie(session, movies):
+    section("3c. get_showtimes_for_movie (one-shot lookup by title)")
+    r = await call(session, "get_showtimes_for_movie", title="AGENT 404")  # wrong case on purpose
+    check("finds a currently-showing movie by title, case-insensitively", r.ok and r.data.get("currently_showing") is True, r.error or str(r.data))
+    if r.ok:
+        check("shape matches get_showtimes (same fields per show)", r.data.get("showtimes") and {"show_id", "theatre", "date", "time", "price_from_inr", "seats_available"} <= set(r.data["showtimes"][0]))
+        gs = await call(session, "get_showtimes", movie_id=r.data["movie_id"])
+        check("returns the same shows as get_showtimes(movie_id) for the resolved id",
+              gs.ok and {s["show_id"] for s in r.data["showtimes"]} == {s["show_id"] for s in gs.data})
+
+    r = await call(session, "get_showtimes_for_movie", title="a title that definitely is not any movie anywhere xyz123")
+    check("a title matching nothing says currently_showing=false with a next_step, not an error",
+          r.ok and r.data.get("currently_showing") is False and not r.data.get("ambiguous") and r.data.get("next_step"), r.error or str(r.data))
+
+    # find a query that matches more than one currently-showing title, to exercise the ambiguous path
+    words = {}
+    for m in movies:
+        for w in m["title"].split():
+            if len(w) > 2:
+                words.setdefault(w.lower(), []).append(m["title"])
+    ambiguous_word = next((w for w, titles in words.items() if len(set(titles)) > 1), None)
+    if ambiguous_word:
+        r = await call(session, "get_showtimes_for_movie", title=ambiguous_word)
+        check(f"an ambiguous title ('{ambiguous_word}') returns candidates instead of guessing",
+              r.ok and r.data.get("ambiguous") is True and len(r.data.get("candidates", [])) > 1, r.error or str(r.data))
+    else:
+        print("  ⏭  skipped the ambiguous-title check (no two current titles share a word right now)")
+
+    r = await call(session, "get_showtimes_for_movie", title="Agent 404", date="tomorrow")
+    check("date filter narrows results to a single date, same as get_showtimes",
+          r.ok and r.data["showtimes"] and len({s["date"] for s in r.data["showtimes"]}) == 1, r.error or "")
 
 
 async def test_showtimes(session):
@@ -479,6 +512,7 @@ async def main():
             await test_discovery(session, init)
             movies = await test_browse(session)
             discovered = await test_discover_and_activate(session, movies)
+            await test_showtimes_for_movie(session, movies)
             tomorrow = await test_showtimes(session)
             show = next((s for s in tomorrow if s["seats_available"] >= 40), tomorrow[0])
             await test_seats(session, show)

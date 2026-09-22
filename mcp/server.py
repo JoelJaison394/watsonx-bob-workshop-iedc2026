@@ -44,16 +44,19 @@ mcp = FastMCP(
     log_level="WARNING",  # keep stdout/stderr quiet; stdio servers must not print noise
     instructions=(
         "Tools for TicketTown, a movie ticket booking service.\n"
-        "Finding a movie: call browse_now_showing first - it's exactly what's on the website "
-        "right now. If the customer names a movie that isn't in those results (an older film, "
-        "or one that just isn't in this month's line-up), call find_any_movie to locate it on "
+        "'What are the showtimes for <movie>?' - call get_showtimes_for_movie with the title "
+        "directly; it resolves the movie for you in one call. Use browse_now_showing instead "
+        "only when the customer wants to browse (e.g. 'what's playing today', 'any comedies?').\n"
+        "If a movie isn't currently showing (get_showtimes_for_movie says currently_showing: "
+        "false, or browse_now_showing doesn't have it), call find_any_movie to locate it on "
         "TMDB, confirm the right one with the customer (title + year), then call "
         "add_movie_to_lineup with its tmdb_id before continuing - this brings it onto the site "
         "with real showtimes so booking works normally from then on.\n"
-        "Booking: browse_now_showing/add_movie_to_lineup -> get_showtimes -> suggest_seats (or "
-        "get_seat_map for specific seats) -> create_booking -> confirm_payment. Always confirm "
-        "the movie, showtime, seats, price and the customer's email and phone before "
-        "create_booking, and get an explicit yes before confirm_payment."
+        "Booking: get_showtimes_for_movie (or browse_now_showing/add_movie_to_lineup then "
+        "get_showtimes) -> suggest_seats (or get_seat_map for specific seats) -> create_booking "
+        "-> confirm_payment. Always confirm the movie, showtime, seats, price and the "
+        "customer's email and phone before create_booking, and get an explicit yes before "
+        "confirm_payment."
     ),
 )
 
@@ -111,6 +114,19 @@ def _booking_summary(b: dict) -> dict:
         out["payment_method"] = b["payment"]["method"]
         out["payment_reference"] = b["payment"]["reference"]
     return out
+
+
+def _best_title_match(movies: list[dict], title: str) -> tuple[dict | None, list[dict]]:
+    """Exact match wins outright. Multiple partial matches are returned as candidates rather
+    than guessing - picking the wrong "Spider-Man" would book the wrong movie entirely."""
+    q = title.strip().lower()
+    exact = [m for m in movies if m["title"].lower() == q]
+    if exact:
+        return exact[0], []
+    partial = [m for m in movies if q in m["title"].lower()]
+    if len(partial) == 1:
+        return partial[0], []
+    return None, partial
 
 
 def _movie_summary(m: dict) -> dict:
@@ -200,6 +216,53 @@ async def add_movie_to_lineup(
 # ---------------------------------------------------------------------------
 # Tools - showtimes, seats, booking
 # ---------------------------------------------------------------------------
+@mcp.tool(annotations=READ_ONLY)
+async def get_showtimes_for_movie(
+    title: Annotated[str, Field(description="The movie title, exactly as the customer said it. No need to look up its id first.")],
+    date: Annotated[str | None, Field(description="'today', 'tomorrow' or a YYYY-MM-DD date. Leave empty for all upcoming shows.")] = None,
+) -> dict:
+    """The fastest way to answer 'what are the showtimes for <movie>?' - looks the title up and returns its schedule in one
+    call, instead of browse_now_showing followed by get_showtimes.
+    If the movie is currently showing, returns currently_showing=true plus its showtimes (same shape as get_showtimes).
+    If it isn't currently showing, returns currently_showing=false and a next_step telling you to call find_any_movie -
+    do that instead of telling the customer it doesn't exist. If the title matches more than one movie currently
+    showing, returns ambiguous=true with candidates instead of guessing - ask the customer which one they mean."""
+    movies = (await _call("GET", "/api/movies"))["movies"]
+    match, ambiguous = _best_title_match(movies, title)
+    if ambiguous:
+        return {
+            "currently_showing": False,
+            "ambiguous": True,
+            "candidates": [_movie_summary(m) for m in ambiguous],
+            "next_step": "Ask the customer which one they mean, then call get_showtimes with its movie_id.",
+        }
+    if not match:
+        return {
+            "currently_showing": False,
+            "ambiguous": False,
+            "next_step": f"'{title}' isn't currently showing. Call find_any_movie to search for it, confirm the "
+            "exact title (and year) with the customer, then add_movie_to_lineup before booking.",
+        }
+    params: dict = {"movie_id": match["id"]}
+    if date:
+        params["date"] = date
+    shows = (await _call("GET", "/api/shows", params=params))["shows"]
+    if not date:
+        shows = shows[:24]  # same cap as get_showtimes, and for the same reason: never truncate a specific date away
+    return {
+        "currently_showing": True,
+        **_movie_summary(match),
+        "showtimes": [
+            {
+                "show_id": s["id"], "theatre": s["theatre"], "screen": s["screen"], "date": s["date"], "time": s["time"],
+                "price_from_inr": s["price"], "price_by_tier_inr": {t["name"]: t["price"] for t in s["tiers"]},
+                "seats_available": s["seats_available"],
+            }
+            for s in shows
+        ],
+    }
+
+
 @mcp.tool(annotations=READ_ONLY)
 async def get_showtimes(
     movie_id: Annotated[int, Field(description="Movie id from browse_now_showing or add_movie_to_lineup.")],

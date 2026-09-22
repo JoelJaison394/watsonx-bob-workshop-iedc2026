@@ -30,7 +30,7 @@ async def run(session: ClientSession):
         print(f"→ {tool}({json.dumps(args)})\n  {json.dumps(out)[:260]}\n")
         return out
 
-    movies = await call("search_movies", query="agent")
+    movies = await call("browse_now_showing", query="agent")
     shows = await call("get_showtimes", movie_id=movies[0]["movie_id"], date="tomorrow")
     show_id = shows[0]["show_id"]
     suggestion = await call("suggest_seats", show_id=show_id, count=2)

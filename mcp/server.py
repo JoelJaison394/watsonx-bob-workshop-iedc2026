@@ -5,6 +5,16 @@ built in watsonx Orchestrate) can browse movies and book tickets. Every
 booking made here is tagged source="agent", so the website's live feed shows
 it with a robot badge.
 
+Movie discovery is two-tier, matching how the website itself works:
+  - browse_now_showing: only what's actually listed and bookable on the site
+    right now (curated for the workshop's mostly-Malayalam audience, plus
+    trending English and other Indian-language releases this month).
+  - find_any_movie -> add_movie_to_lineup: for a title that ISN'T in
+    browse_now_showing (an older release, or one outside this month's
+    curated pull). add_movie_to_lineup brings it onto the live site with
+    real showtimes, in sync with the backend database and the frontend -
+    anyone watching the homepage sees it appear immediately.
+
 Run it:
     python server.py                       # stdio  -> what Orchestrate imports
     python server.py --transport http      # streamable HTTP on :8000/mcp
@@ -33,11 +43,17 @@ mcp = FastMCP(
     "TicketTown",
     log_level="WARNING",  # keep stdout/stderr quiet; stdio servers must not print noise
     instructions=(
-        "Tools for TicketTown, a movie ticket booking service. Typical flow: "
-        "search_movies -> get_showtimes -> suggest_seats -> create_booking -> "
-        "confirm_payment. Always confirm the movie, showtime, seats, price and "
-        "the customer's email and phone with the user before create_booking, "
-        "and get an explicit yes before confirm_payment."
+        "Tools for TicketTown, a movie ticket booking service.\n"
+        "Finding a movie: call browse_now_showing first - it's exactly what's on the website "
+        "right now. If the customer names a movie that isn't in those results (an older film, "
+        "or one that just isn't in this month's line-up), call find_any_movie to locate it on "
+        "TMDB, confirm the right one with the customer (title + year), then call "
+        "add_movie_to_lineup with its tmdb_id before continuing - this brings it onto the site "
+        "with real showtimes so booking works normally from then on.\n"
+        "Booking: browse_now_showing/add_movie_to_lineup -> get_showtimes -> suggest_seats (or "
+        "get_seat_map for specific seats) -> create_booking -> confirm_payment. Always confirm "
+        "the movie, showtime, seats, price and the customer's email and phone before "
+        "create_booking, and get an explicit yes before confirm_payment."
     ),
 )
 
@@ -45,17 +61,23 @@ mcp = FastMCP(
 # ---------------------------------------------------------------------------
 # HTTP plumbing
 # ---------------------------------------------------------------------------
+RETRYABLE_STATUS = {502, 503, 504}  # a free-tier host waking up looks like these, not a real failure
+
+
 async def _call(method: str, path: str, *, params: dict | None = None, body: dict | None = None) -> dict:
     """Call the TicketTown API and turn failures into readable tool errors."""
     last_err: Exception | None = None
     async with httpx.AsyncClient(base_url=API_URL, timeout=45.0) as client:
-        for attempt in range(2):  # a sleeping free-tier host can need a second try
+        for attempt in range(3):  # a sleeping free-tier host can need a couple of tries to wake up
             try:
                 res = await client.request(method, path, params=params, json=body)
+                if res.status_code in RETRYABLE_STATUS and attempt < 2:
+                    await asyncio.sleep(2 * (attempt + 1))
+                    continue
                 break
             except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout) as err:
                 last_err = err
-                await asyncio.sleep(2)
+                await asyncio.sleep(2 * (attempt + 1))
         else:
             raise ToolError(f"Could not reach the TicketTown API at {API_URL}. Is the backend running? ({last_err})")
 
@@ -91,41 +113,96 @@ def _booking_summary(b: dict) -> dict:
     return out
 
 
+def _movie_summary(m: dict) -> dict:
+    return {
+        "movie_id": m["id"],
+        "title": m["title"],
+        "genres": m["genres"],
+        "language": m["language"],
+        "duration_minutes": m["duration_min"],
+        "certificate": m["rating"],
+        "audience_score_out_of_10": m["score"],
+        "release_date": m["release_date"],
+        "description": m["description"],
+        "tickets_from_inr": m["from_price"],
+    }
+
+
 # ---------------------------------------------------------------------------
-# Tools
+# Tools - movie discovery
 # ---------------------------------------------------------------------------
 @mcp.tool(annotations=READ_ONLY)
-async def search_movies(
+async def browse_now_showing(
     query: Annotated[str | None, Field(description="Part of a movie title, e.g. 'agent'. Leave empty to list everything.")] = None,
     genre: Annotated[str | None, Field(description="Genre filter such as Comedy, Thriller, Sports, Drama, Animation, Romance, Action or Sci-Fi.")] = None,
+    language: Annotated[str | None, Field(description="Language filter such as Malayalam, English, Hindi, Tamil or Telugu.")] = None,
 ) -> list[dict]:
-    """List the movies currently showing at TicketTown, optionally filtered by title text or genre.
-    Returns each movie's id (needed for get_showtimes), title, genres, language, duration, certificate, audience score out of 10 and starting price in INR."""
+    """List the movies currently showing at TicketTown - exactly what's on the website's home page right now, nothing more.
+    This is the FIRST place to look for any movie request. If the title the customer wants isn't in these results, it is not
+    currently bookable; use find_any_movie next instead of guessing or refusing.
+    Returns each movie's id (needed for get_showtimes), title, genres, language, duration, certificate, audience score out of 10,
+    release date and starting price in INR."""
     movies = (await _call("GET", "/api/movies"))["movies"]
     if query:
         movies = [m for m in movies if query.lower() in m["title"].lower()]
     if genre:
         movies = [m for m in movies if genre.lower() in [g.lower() for g in m["genres"]]]
-    return [
-        {
-            "movie_id": m["id"],
-            "title": m["title"],
-            "genres": m["genres"],
-            "language": m["language"],
-            "duration_minutes": m["duration_min"],
-            "certificate": m["rating"],
-            "audience_score_out_of_10": m["score"],
-            "release_date": m["release_date"],
-            "description": m["description"],
-            "tickets_from_inr": m["from_price"],
-        }
-        for m in movies
-    ]
+    if language:
+        movies = [m for m in movies if m["language"].lower() == language.lower()]
+    return [_movie_summary(m) for m in movies]
 
 
 @mcp.tool(annotations=READ_ONLY)
+async def find_any_movie(
+    title: Annotated[str, Field(description="The movie title to look for, as the customer said it.")],
+) -> list[dict]:
+    """Search for a movie beyond what's currently showing - use this only after browse_now_showing came back without it.
+    Searches all of TMDB, so it also finds older films and ones outside this month's line-up.
+    Results are NOT bookable yet: they have no showtimes and don't appear on the website. Read the results back to the
+    customer (title and year, since the same title can have several versions) and once they confirm which one, call
+    add_movie_to_lineup with its tmdb_id before doing anything else with it."""
+    r = await _call("GET", "/api/movies/search", params={"q": title})
+    if not r.get("tmdb_enabled"):
+        raise ToolError("Movie search isn't available right now (TMDB isn't configured on this server).")
+    return [
+        {
+            "tmdb_id": m["tmdb_id"],
+            "title": m["title"],
+            "year": (m["release_date"] or "")[:4] or None,
+            "language": m["language"],
+            "overview": m["overview"],
+        }
+        for m in r["results"]
+    ]
+
+
+@mcp.tool(annotations=WRITE)
+async def add_movie_to_lineup(
+    tmdb_id: Annotated[int, Field(description="tmdb_id of the exact movie the customer confirmed, from find_any_movie.")],
+) -> dict:
+    """Bring a movie found via find_any_movie onto the live site: adds it to the database and generates real showtimes for
+    the next few days, in sync with the website - it appears there immediately, live, for anyone watching.
+    Only call this after the customer has confirmed the exact title (and year, if there were several matches).
+    Safe to call again for the same movie; it won't be duplicated. Returns the movie plus its showtimes, ready for
+    suggest_seats / create_booking without another lookup."""
+    r = await _call("POST", "/api/movies/activate", body={"tmdb_id": tmdb_id})
+    movie, shows = r["movie"], await _call("GET", "/api/shows", params={"movie_id": r["movie"]["id"]})
+    return {
+        **_movie_summary(movie),
+        "was_already_in_lineup": r["was_already_listed"],
+        "showtimes": [
+            {"show_id": s["id"], "theatre": s["theatre"], "date": s["date"], "time": s["time"], "price_from_inr": s["price"]}
+            for s in shows["shows"]
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tools - showtimes, seats, booking
+# ---------------------------------------------------------------------------
+@mcp.tool(annotations=READ_ONLY)
 async def get_showtimes(
-    movie_id: Annotated[int, Field(description="Movie id from search_movies.")],
+    movie_id: Annotated[int, Field(description="Movie id from browse_now_showing or add_movie_to_lineup.")],
     date: Annotated[str | None, Field(description="'today', 'tomorrow' or a YYYY-MM-DD date. Leave empty for all upcoming shows.")] = None,
 ) -> list[dict]:
     """List upcoming showtimes for a movie: theatre, screen, date, 24-hour time, seat prices in INR (three tiers: Silver, Gold, Platinum) and how many seats are still free.
@@ -134,6 +211,10 @@ async def get_showtimes(
     if date:
         params["date"] = date
     shows = (await _call("GET", "/api/shows", params=params))["shows"]
+    # Cap the list, but only when it's actually broad (no date given): with a specific date the
+    # result set is already small, and truncating it could silently hide the very date asked for.
+    if not date:
+        shows = shows[:24]
     return [
         {
             "show_id": s["id"],
@@ -147,7 +228,7 @@ async def get_showtimes(
             "seats_available": s["seats_available"],
         }
         for s in shows
-    ][:24]
+    ]
 
 
 @mcp.tool(annotations=READ_ONLY)

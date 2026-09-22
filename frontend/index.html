@@ -1193,7 +1193,7 @@ const closeSearch = () => { $('#search-results').classList.add('hidden'); };
 
 /* ───────────────────────────── live updates (SSE) ───────────────────────────── */
 let eventSource = null;
-const LIVE_TYPES = ['booking.created', 'booking.confirmed', 'booking.cancelled', 'booking.expired', 'reset'];
+const LIVE_TYPES = ['booking.created', 'booking.confirmed', 'booking.cancelled', 'booking.expired', 'movie.activated', 'reset'];
 
 function setLive(on) {
   const changed = state.live !== on;
@@ -1319,6 +1319,15 @@ function onLiveEvent(type, data) {
   if (type === 'reset') {
     state.feed = []; renderFeed(); toast('🧹 Demo bookings were reset.');
     refreshCurrentView(); if (state.view.name === 'bookings') route();
+    return;
+  }
+  if (type === 'movie.activated') {
+    // An agent (or another visitor) just brought a movie onto the site that wasn't listed before.
+    const key = `${data.at}-${data.seq}`;
+    if (seenEvents.has(key)) return;
+    seenEvents.add(key);
+    toast(`🎬 <b>${esc(data.movie.title)}</b> just joined the line-up.`);
+    if (state.view.name === 'home') ensureMovies(true).then(() => { drawHome(); startHero(); }).catch(() => {});
     return;
   }
   const b = data.booking;

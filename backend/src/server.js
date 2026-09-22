@@ -5,9 +5,9 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'node:crypto';
 import { db, tx } from './db.js';
-import { ensureCatalog, ensureShows, localNow, seatLabels } from './seed.js';
+import { ensureCatalog, ensureShows, ensureShowsForMovie, localNow, seatLabels } from './seed.js';
 import { seatTotal, tiersFor } from './catalog.js';
-import { syncMovies, tmdbEnabled } from './tmdb.js';
+import { syncMovies, tmdbEnabled, searchMovie, activateMovie } from './tmdb.js';
 import { sseHandler, broadcast, clientCount, lastSeq, eventsSince } from './events.js';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -183,6 +183,8 @@ app.get('/', (req, res) => {
     endpoints: [
       'GET  /api/health',
       'GET  /api/movies',
+      'GET  /api/movies/search?q=  (all of TMDB, not just the current line-up)',
+      'POST /api/movies/activate  ({tmdb_id}: bring a movie onto the site + generate showtimes)',
       'GET  /api/movies/:id',
       'GET  /api/shows?movie_id=&date=',
       'GET  /api/shows/:id',
@@ -256,6 +258,42 @@ app.get('/api/movies', (req, res) => {
     .prepare(`${MOVIE_SQL} WHERE m.active = 1 GROUP BY m.id ORDER BY (m.tmdb_id IS NULL) DESC, m.vote_count DESC, m.id`)
     .all(now.date, now.date, now.time);
   res.json({ movies: rows.map((m) => movieDto(m)), source: rows.some((m) => m.tmdb_id) ? 'tmdb' : 'demo' });
+});
+
+// Search ALL of TMDB (not just what's currently active) - for a movie the customer wants that
+// isn't in the current line-up. Read-only; doesn't touch the database.
+// Registered before /api/movies/:id, otherwise Express would match ":id" = "search" first.
+app.get('/api/movies/search', async (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  if (!q) fail(400, 'BAD_QUERY', 'q is required.');
+  if (!tmdbEnabled()) return res.json({ results: [], tmdb_enabled: false });
+  try {
+    res.json({ results: await searchMovie(q), tmdb_enabled: true });
+  } catch (err) {
+    fail(502, 'TMDB_FAILED', err.message);
+  }
+});
+
+// Bring one TMDB movie onto the site: mark it active, generate showtimes for it right now, and
+// tell everyone watching (the website's home page updates live). Idempotent.
+app.post('/api/movies/activate', async (req, res) => {
+  const tmdbId = Number(req.body?.tmdb_id);
+  if (!Number.isInteger(tmdbId)) fail(400, 'BAD_TMDB_ID', 'tmdb_id is required.');
+  if (!tmdbEnabled()) fail(409, 'TMDB_DISABLED', 'TMDB is not configured on this server.');
+
+  let result;
+  try {
+    result = await activateMovie(tmdbId);
+  } catch (err) {
+    if (/TMDB 404/.test(err.message)) fail(404, 'MOVIE_NOT_FOUND', `No TMDB movie with id ${tmdbId}.`);
+    fail(502, 'TMDB_FAILED', err.message);
+  }
+  const showsCreated = ensureShowsForMovie(result.movieId);
+  const now = localNow();
+  const row = db.prepare(`${MOVIE_SQL} WHERE m.id = ? GROUP BY m.id`).get(now.date, now.date, now.time, result.movieId);
+  const movie = movieDto(row, { full: true });
+  broadcast('movie.activated', { movie });
+  res.status(result.alreadyKnown ? 200 : 201).json({ movie, shows_created: showsCreated, was_already_listed: result.alreadyKnown });
 });
 
 app.get('/api/movies/:id', (req, res) => {

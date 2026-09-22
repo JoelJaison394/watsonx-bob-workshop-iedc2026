@@ -6,7 +6,7 @@ A small movie-booking app built for the **watsonx Orchestrate workshop**. Attend
 ┌──────────────┐   REST + SSE    ┌───────────────────┐   REST    ┌──────────────┐
 │  frontend/   │ ──────────────▶ │     backend/      │ ◀──────── │    mcp/      │
 │  index.html  │ ◀── live feed ─ │ Node + Express    │           │ Python FastMCP│
-│  (Replit)    │                 │ + SQLite          │           │ 9 tools      │
+│  (Replit)    │                 │ + SQLite          │           │ 11 tools     │
 └──────────────┘                 └───────────────────┘           └──────┬───────┘
                                                                         │ MCP
                                                               ┌─────────▼────────┐
@@ -160,6 +160,8 @@ The backend has to be on the public internet: Orchestrate runs in the cloud and 
 |---|---|---|
 | GET | `/api/health` | |
 | GET | `/api/movies` · `/api/movies/:id` | List, or one movie with cast and trailer key |
+| GET | `/api/movies/search?q=` | Searches all of TMDB, not just the current line-up (for an older/unlisted title) |
+| POST | `/api/movies/activate` | `{tmdb_id}` → brings that movie onto the site with real showtimes, right away. Idempotent. Broadcasts `movie.activated`. |
 | GET | `/api/shows?movie_id=&date=` | `date` = `today`, `tomorrow` or `YYYY-MM-DD`. Hides shows that already started. |
 | GET | `/api/shows/:id` | Show + seat map (`booked`, `held`) |
 | GET | `/api/shows/:id/suggest?count=2` | Best seats together |
@@ -168,7 +170,7 @@ The backend has to be on the public internet: Orchestrate runs in the cloud and 
 | POST | `/api/bookings/:code/pay` | Mock. `{method: card\|upi\|wallet}`. Card ending `0002` is declined. |
 | POST | `/api/bookings/:code/cancel` | |
 | GET | `/api/activity` | Recent bookings for the live drawer |
-| GET | `/api/events` | **Server-Sent Events**: `booking.created/confirmed/cancelled/expired`, `reset` |
+| GET | `/api/events` | **Server-Sent Events**: `booking.created/confirmed/cancelled/expired`, `movie.activated`, `reset` |
 | GET | `/api/events/poll?since=` | The same events for clients that can't stream. Call once without `since` to get the current position, then poll with `since=<last>`. |
 | POST | `/api/admin/reset` | Wipes demo bookings. Needs `x-admin-key`. |
 | POST | `/api/admin/sync-movies` | Re-pull the line-up from TMDB. Needs `x-admin-key`. |
@@ -182,9 +184,15 @@ curl -X POST https://your-backend/api/admin/reset -H "x-admin-key: tickettown"
 
 ## 3 · MCP server
 
-Nine tools, all thin wrappers over the API and tagged `source: "agent"`:
+Eleven tools, all thin wrappers over the API. Every booking they make is tagged `source: "agent"`.
 
-`search_movies` · `get_showtimes` · `suggest_seats` · `get_seat_map` · `create_booking` · `confirm_payment` · `get_booking` · `list_bookings` · `cancel_booking`
+Movie discovery is two-tier, matching how the site itself works:
+
+- **`browse_now_showing`** - only what's actually listed and bookable right now. The backend curates this for the workshop's mostly-Malayalam audience: it reserves several slots for trending Malayalam releases from this month, then fills the rest with trending English and other Indian-language titles (Tamil, Telugu, Hindi, ...) so it's never Malayalam-only and never empty if a month happens to have no new Malayalam release. See `TMDB_LIMIT` / the curation logic in [`backend/src/tmdb.js`](backend/src/tmdb.js).
+- **`find_any_movie`** - searches *all* of TMDB, for a title that isn't in `browse_now_showing` (an older release, or one outside this month's curated pull). Read-only; returns candidates to confirm, nothing is booked or added yet.
+- **`add_movie_to_lineup`** - brings a movie found via `find_any_movie` onto the live site: adds it to the database and generates real showtimes for it immediately, in sync with the frontend - anyone watching the home page sees it appear live. Idempotent. A movie added this way is never silently removed by the periodic TMDB re-sync while a real (non-seed) booking exists for it.
+
+Booking, same as before: `get_showtimes` · `suggest_seats` · `get_seat_map` · `create_booking` · `confirm_payment` · `get_booking` · `list_bookings` · `cancel_booking`
 
 Point it at your backend by editing `API_URL` in [`mcp/server.py`](mcp/server.py) or setting the `TICKETTOWN_API_URL` env var.
 
@@ -200,7 +208,8 @@ python test_client.py --http http://localhost:8000/mcp
 ```bash
 cd mcp
 python test_client.py     # quick smoke test: one booking, start to finish
-python test_tools.py      # thorough: 139 checks across all 9 tools
+python test_tools.py      # thorough: 159 checks across all 11 tools, incl. discovering and
+                           # booking a movie that isn't in the current line-up
 ```
 
 `test_tools.py` connects like a real MCP client and checks the tool list and schemas, every tool's success and failure paths, tier pricing, that a rejected booking holds nothing, and that the agent's actions produce live events for the website. It also checks the HTTP transport and what the agent sees when the backend is down. It cancels what it books. Use `TICKETTOWN_API_URL=<address>` to test through a tunnel.

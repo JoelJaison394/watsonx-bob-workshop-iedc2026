@@ -27,6 +27,7 @@
 | 6 | Agent asks to confirm payment → say *"yes, pay"* | Seats go dark (booked), toast "🤖 AI agent booked…", feed updates | "`confirm_payment`. The website never refreshed." |
 | 7 | Ask for a seat that's already gone, e.g. *"Now book one of the seats I just booked, for the same show"* | Agent recovers and offers other seats | "The error message came from the API through MCP, and the agent used it." |
 | 8 | *"Show my bookings"* then *"Cancel the last one"* | Seats free up live | Cancel = destructive tool, so the agent should confirm first |
+| 9 | Leave the **home page** open on the projector. Ask the agent for a movie that clearly isn't listed, e.g. *"Book 2 seats for The Dark Knight tonight"* | Agent says it's not currently showing, asks to confirm, then the movie's poster and backdrop appear live on the home page carousel with a toast: "🎬 The Dark Knight just joined the line-up." | "`find_any_movie` searched all of TMDB. `add_movie_to_lineup` just wrote it into our own database and generated real showtimes - that's why it appeared on the projector without anyone touching the website." |
 
 ### Prompts that work well
 
@@ -38,6 +39,7 @@
 - "What's the highest rated movie showing right now?" (uses the audience score from TMDB)
 - "What's the status of booking TT-XXXXXX?"
 - "I'd like to sit in row F, seats 5 and 6." (uses `get_seat_map`)
+- "Book 2 seats for Inception / The Godfather / any classic tonight." (not in the current line-up → `find_any_movie` → `add_movie_to_lineup`)
 
 ## Agent instructions (paste into your Orchestrate agent)
 
@@ -47,15 +49,19 @@ You are TickyBot, the booking assistant for TicketTown, a movie ticket service.
 Use your TicketTown tools to help customers find movies and book tickets.
 
 Rules:
-1. To find showtimes, first call search_movies to get the movie_id, then get_showtimes.
+1. To find a movie, first call browse_now_showing to get the movie_id, then get_showtimes.
    Dates: use "today" or "tomorrow" when the customer says so.
-2. If the customer doesn't name specific seats, call suggest_seats. If they name seats, call get_seat_map to check them.
-3. Before create_booking you MUST have: the showtime, the seats, and the customer's email AND phone number. Ask for anything missing. Never invent contact details.
-4. Seats are priced by tier (Silver, Gold, Platinum). After create_booking, tell the customer the movie, theatre, time, seats and total price in rupees (₹), and ask whether to pay now.
+2. If browse_now_showing doesn't have the movie the customer named, call find_any_movie to search
+   for it. Read back the title and year to confirm you found the right one (the same title can
+   have several versions), then call add_movie_to_lineup with its tmdb_id before doing anything
+   else with it - only after that does it have real showtimes to book.
+3. If the customer doesn't name specific seats, call suggest_seats. If they name seats, call get_seat_map to check them.
+4. Before create_booking you MUST have: the showtime, the seats, and the customer's email AND phone number. Ask for anything missing. Never invent contact details.
+5. Seats are priced by tier (Silver, Gold, Platinum). After create_booking, tell the customer the movie, theatre, time, seats and total price in rupees (₹), and ask whether to pay now.
    Only call confirm_payment after they clearly say yes. Unpaid bookings are released after about 10 minutes.
-5. Ask for confirmation before cancel_booking.
-6. If a tool returns an error (for example seats already taken), explain it in plain words and offer alternatives.
-7. Show times in 12-hour format. Keep replies short and friendly.
+6. Ask for confirmation before cancel_booking.
+7. If a tool returns an error (for example seats already taken), explain it in plain words and offer alternatives.
+8. Show times in 12-hour format. Keep replies short and friendly.
 ```
 
 Suggested agent description: *"Books movie tickets at TicketTown: searches movies, checks showtimes and seats, holds seats and confirms payment."*
@@ -65,7 +71,8 @@ Suggested agent description: *"Books movie tickets at TicketTown: searches movie
 | Agenda item | Where to show it |
 |---|---|
 | What MCP is | [`mcp/server.py`](mcp/server.py): each `@mcp.tool` is one function plus a docstring. The docstring **is** the tool description the LLM reads. |
-| Tools vs APIs | Same nine operations exist as REST routes in [`backend/src/server.js`](backend/src/server.js). MCP adds names, descriptions and typed parameters for the model. |
+| Tools vs APIs | The same operations exist as REST routes in [`backend/src/server.js`](backend/src/server.js). MCP adds names, descriptions and typed parameters for the model. |
+| Agent + database in sync | Ask for an unlisted movie (demo beat 9). `add_movie_to_lineup` writes straight into the same SQLite database the website reads from - there's no separate "agent data." |
 | Orchestrate agent | The instructions above, plus the toolkit import command in the README. |
 | Embedded chat | Bottom of `frontend/index.html`: a marked slot for the embed snippet. |
 | Why live UI | `GET /api/events` (SSE) and `onLiveEvent()` in the frontend. |

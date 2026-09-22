@@ -4,9 +4,10 @@
 //   TMDB_API_KEY     v3 API key, OR a v4 "Read Access Token" (starts with "eyJ")
 //   USE_TMDB=false   force the built-in fictional movies
 //   TMDB_REGION      default IN
-//   TMDB_LIMIT       how many movies to list, default 12
+//   TMDB_LIMIT       how many movies to list, default 16
 import { db, tx } from './db.js';
 import { WORKSHOP_MOVIE_ID } from './catalog.js';
+import { localNow } from './seed.js';
 
 const BASE = () => (process.env.TMDB_BASE_URL || 'https://api.themoviedb.org/3').replace(/\/+$/, '');
 const IMG = () => (process.env.TMDB_IMAGE_BASE || 'https://image.tmdb.org/t/p').replace(/\/+$/, '');
@@ -65,11 +66,16 @@ function certificate(releaseDates) {
 function mapMovie(d) {
   const trailers = (d.videos?.results ?? []).filter((v) => v.site === 'YouTube' && v.type === 'Trailer');
   const trailer = trailers.find((v) => v.official) ?? trailers[0];
-  const genres = (d.genres ?? []).map((g) => g.name);
+  // A handful of TMDB entries (mostly smaller regional releases) carry no genre tags at all.
+  // Fall back to a single genre rather than leaving the movie with an empty genres list -
+  // both the UI and the MCP tools promise every movie has at least one.
+  const rawGenres = (d.genres ?? []).map((g) => g.name);
+  const genre = rawGenres[0] ?? 'Drama';
+  const genres = rawGenres.length ? rawGenres : [genre];
   return {
     tmdb_id: d.id,
     title: d.title,
-    genre: genres[0] ?? 'Drama',
+    genre,
     genres,
     language: languageName(d.original_language),
     duration_min: d.runtime || 120,
@@ -103,15 +109,111 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
+const uniqById = (list) => {
+  const seen = new Set();
+  return list.filter((m) => {
+    if (!m.poster_path || seen.has(m.id)) return false;
+    seen.add(m.id);
+    return true;
+  });
+};
+
+const discover = (region, params) =>
+  tmdb('/discover/movie', { region, sort_by: 'popularity.desc', include_adult: 'false', ...params })
+    .then((r) => r.results ?? [])
+    .catch(() => []); // one failing source shouldn't sink the whole line-up
+
+// English + the major Indian languages. Keeps the "trending" pool to what an Indian audience
+// would actually recognise - TMDB's India-region discover results otherwise pull in unrelated
+// festival/streaming titles (French, Spanish, ...) that just happen to have an IN release date logged.
+const RELEVANT_LANGS = new Set(['hi', 'ta', 'te', 'kn', 'ml', 'en', 'bn', 'mr', 'pa', 'gu', 'or']);
+const RELEVANT_LANGS_PARAM = [...RELEVANT_LANGS].join('|'); // TMDB accepts pipe-separated OR
+
+/**
+ * Build the "now showing" line-up for an Indian audience.
+ *
+ * TMDB's own "now playing" endpoint is Hollywood-heavy even with region=IN, so on its own it
+ * under-represents regional cinema. We reserve some slots for popular Malayalam releases from
+ * this month (the workshop's own audience is mostly Malayalam-speaking), then fill the rest of
+ * the line-up with a broader "trending in India this month" pool (any language, including
+ * English and Hindi) plus TMDB's now-playing list - so the page never becomes Malayalam-only,
+ * and never drops to zero if a given month happens to have no new Malayalam release.
+ */
 export async function fetchNowPlaying() {
-  const limit = Number(process.env.TMDB_LIMIT) || 12;
+  const limit = Number(process.env.TMDB_LIMIT) || 16;
   const region = process.env.TMDB_REGION || 'IN';
-  const list = await tmdb('/movie/now_playing', { region, language: 'en-US', page: 1 });
-  const candidates = (list.results ?? []).filter((m) => m.poster_path).slice(0, limit);
-  const details = await mapLimit(candidates, 4, (m) =>
+  const { date: today } = localNow();
+  const monthStart = today.slice(0, 8) + '01';
+  const thisMonth = { 'primary_release_date.gte': monthStart, 'primary_release_date.lte': today };
+
+  const [nowPlaying, malayalam, trending] = await Promise.all([
+    // now_playing has no language filter param, so filter its results after the fact.
+    tmdb('/movie/now_playing', { region, language: 'en-US', page: 1 })
+      .then((r) => (r.results ?? []).filter((m) => RELEVANT_LANGS.has(m.original_language)))
+      .catch(() => []),
+    discover(region, { with_original_language: 'ml', ...thisMonth }),
+    discover(region, { with_original_language: RELEVANT_LANGS_PARAM, ...thisMonth }),
+  ]);
+
+  const malayalamReserve = Math.max(4, Math.ceil(limit / 3));
+  const malayalamPicks = uniqById(malayalam).slice(0, malayalamReserve);
+  const reserved = new Set(malayalamPicks.map((m) => m.id));
+  const restPicks = uniqById([...trending, ...nowPlaying].sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0)))
+    .filter((m) => !reserved.has(m.id));
+  const chosen = [...malayalamPicks, ...restPicks].slice(0, limit);
+
+  const details = await mapLimit(chosen, 4, (m) =>
     tmdb(`/movie/${m.id}`, { append_to_response: 'credits,videos,release_dates', language: 'en-US' }).catch(() => null),
   );
   return details.filter(Boolean).map(mapMovie);
+}
+
+/**
+ * Free-text search across ALL of TMDB, not just what's currently active on the site. Used when
+ * a customer asks for a movie that isn't in the current line-up (an older release, or one that
+ * hasn't made this month's cut). Lightweight - no per-result detail fetch - just enough to pick
+ * the right one before calling activateMovie().
+ */
+export async function searchMovie(query) {
+  if (!tmdbEnabled()) throw new Error('TMDB is not configured on this server (no TMDB_API_KEY).');
+  const list = await tmdb('/search/movie', { query, region: process.env.TMDB_REGION || 'IN', language: 'en-US', include_adult: 'false' });
+  return (list.results ?? [])
+    .slice(0, 8)
+    .map((m) => ({
+      tmdb_id: m.id,
+      title: m.title,
+      release_date: m.release_date || null,
+      language: languageName(m.original_language),
+      poster_url: m.poster_path ? `${IMG()}/w500${m.poster_path}` : null,
+      overview: m.overview || null,
+      popularity: m.popularity ?? 0,
+    }))
+    .sort((a, b) => b.popularity - a.popularity);
+}
+
+/**
+ * Bring one specific TMDB movie onto the site (active=1), fetching full details if we don't
+ * already have it. Idempotent: calling it again for the same tmdb_id just re-activates it.
+ * Does NOT create showtimes - the caller (server.js) does that, since that logic lives in seed.js.
+ */
+export async function activateMovie(tmdbId) {
+  if (!tmdbEnabled()) throw new Error('TMDB is not configured on this server (no TMDB_API_KEY).');
+  const existing = db.prepare('SELECT id, active, title FROM movies WHERE tmdb_id = ?').get(tmdbId);
+  if (existing) {
+    if (!existing.active) db.prepare('UPDATE movies SET active = 1 WHERE id = ?').run(existing.id);
+    return { movieId: existing.id, alreadyKnown: true, title: existing.title };
+  }
+
+  const detail = await tmdb(`/movie/${tmdbId}`, { append_to_response: 'credits,videos,release_dates', language: 'en-US' });
+  const m = mapMovie(detail);
+  const cols = ['tmdb_id', 'title', 'genre', 'genres_json', 'language', 'duration_min', 'rating', 'description', 'tagline',
+    'poster_url', 'backdrop_url', 'release_date', 'vote_average', 'vote_count', 'trailer_key', 'cast_json'];
+  const values = [m.tmdb_id, m.title, m.genre, JSON.stringify(m.genres), m.language, m.duration_min, m.rating, m.description,
+    m.tagline, m.poster_url, m.backdrop_url, m.release_date, m.vote_average, m.vote_count, m.trailer_key, JSON.stringify(m.cast)];
+  const res = db
+    .prepare(`INSERT INTO movies (${cols.join(',')},emoji,color1,color2,active) VALUES (${cols.map(() => '?').join(',')},'🎬','#333545','#f84464',1)`)
+    .run(...values);
+  return { movieId: Number(res.lastInsertRowid), alreadyKnown: false, title: m.title };
 }
 
 /**
@@ -140,10 +242,21 @@ export async function syncMovies() {
       else insert.run(m.tmdb_id, ...values);
     }
     const keep = movies.map((m) => m.tmdb_id);
+    const now = localNow();
+    // Never hide a movie that a REAL customer (web or agent) still has a live booking against
+    // for a future show - that would break re-booking or make their own booking hard to find.
+    // (Deliberately excludes source='seed' walk-in bookings: ensureShows() pre-sells some seats
+    // on almost every show it generates, so "has any booking" would otherwise protect nearly
+    // every movie forever and defeat the point of the monthly curation.)
     db.prepare(
       `UPDATE movies SET active = 0
-       WHERE id != ? AND (tmdb_id IS NULL OR tmdb_id NOT IN (${keep.map(() => '?').join(',')}))`,
-    ).run(WORKSHOP_MOVIE_ID, ...keep);
+       WHERE id != ? AND (tmdb_id IS NULL OR tmdb_id NOT IN (${keep.map(() => '?').join(',')}))
+         AND id NOT IN (
+           SELECT DISTINCT s.movie_id FROM bookings b JOIN shows s ON s.id = b.show_id
+           WHERE b.source != 'seed' AND b.status IN ('PENDING_PAYMENT', 'CONFIRMED')
+             AND (s.show_date > ? OR (s.show_date = ? AND s.show_time > ?))
+         )`,
+    ).run(WORKSHOP_MOVIE_ID, ...keep, now.date, now.date, now.time);
     db.prepare('UPDATE movies SET active = 1 WHERE id = ?').run(WORKSHOP_MOVIE_ID);
   });
   return { synced: movies.length, titles: movies.map((m) => m.title) };

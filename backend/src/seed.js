@@ -51,6 +51,48 @@ export function ensureCatalog() {
   });
 }
 
+/** Fisher-Yates, driven by a seeded RNG so the same movie gets the same-shaped schedule each call. */
+function shuffled(arr, rand) {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/**
+ * Generate a believable set of upcoming shows for ONE movie right now, instead of waiting for
+ * the next hourly ensureShows() sweep. Used when a movie is brought onto the site on demand
+ * (see tmdb.js activateMovie()) so it's immediately bookable. Safe to call more than once -
+ * INSERT OR IGNORE means it only ever adds what's missing.
+ */
+export function ensureShowsForMovie(movieId) {
+  const insShow = db.prepare(
+    `INSERT OR IGNORE INTO shows (movie_id,theatre,screen,show_date,show_time,price) VALUES (?,?,?,?,?,?)`,
+  );
+  const rand = mulberry32(movieId * 104729); // stable per movie: re-activating doesn't reshuffle
+  const now = localNow();
+  let created = 0;
+
+  tx(() => {
+    for (let d = 0; d <= DAYS_AHEAD; d++) {
+      const { date } = localNow(d);
+      const slotIdxs = shuffled([...SLOTS.keys()], rand).slice(0, 3);
+      slotIdxs.forEach((slotIdx) => {
+        const time = SLOTS[slotIdx];
+        if (date === now.date && time <= now.time) return; // already started today
+        const theatre = THEATRES[Math.floor(rand() * THEATRES.length)];
+        const screen = `Screen ${1 + Math.floor(rand() * 4)}`;
+        const price = 150 + Math.floor(rand() * 4) * 50 + (slotIdx >= 3 ? 50 : 0);
+        const res = insShow.run(movieId, theatre, screen, date, time, price);
+        if (res.changes === 1) created++;
+      });
+    }
+  });
+  return created;
+}
+
 /** Make sure every listed movie has shows for today + the next few days. */
 export function ensureShows() {
   const insShow = db.prepare(

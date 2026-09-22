@@ -30,12 +30,13 @@ API = os.environ.get("TICKETTOWN_API_URL", "http://localhost:3000").rstrip("/")
 EXPIRY_API = os.environ.get("EXPIRY_API_URL", "").rstrip("/")
 
 EXPECTED_TOOLS = {
-    "search_movies": [], "get_showtimes": ["movie_id"], "suggest_seats": ["show_id", "count"],
+    "browse_now_showing": [], "find_any_movie": ["title"], "add_movie_to_lineup": ["tmdb_id"],
+    "get_showtimes": ["movie_id"], "suggest_seats": ["show_id", "count"],
     "get_seat_map": ["show_id"], "create_booking": ["show_id", "seats", "email", "phone"],
     "confirm_payment": ["booking_code"], "get_booking": ["booking_code"],
     "list_bookings": ["email"], "cancel_booking": ["booking_code"],
 }
-READ_ONLY = {"search_movies", "get_showtimes", "suggest_seats", "get_seat_map", "get_booking", "list_bookings"}
+READ_ONLY = {"browse_now_showing", "find_any_movie", "get_showtimes", "suggest_seats", "get_seat_map", "get_booking", "list_bookings"}
 
 results: list[tuple[str, bool]] = []
 active_codes: set[str] = set()  # bookings we made and haven't cancelled; cleaned up at the end
@@ -129,9 +130,9 @@ async def test_discovery(session, init):
     return tools
 
 
-async def test_search(session):
-    section("2. search_movies")
-    r = await call(session, "search_movies")
+async def test_browse(session):
+    section("2. browse_now_showing")
+    r = await call(session, "browse_now_showing")
     check("lists movies with no filter", r.ok and len(r.data) >= 2, r.error or "")
     movies = r.data
     need = {"movie_id", "title", "genres", "language", "duration_minutes", "certificate", "audience_score_out_of_10", "tickets_from_inr"}
@@ -140,18 +141,67 @@ async def test_search(session):
     check("the workshop movie 'Agent 404' is present", any(m["title"] == "Agent 404" for m in movies))
     check("genres come back as lists", all(isinstance(m["genres"], list) and m["genres"] for m in movies))
 
-    r = await call(session, "search_movies", query="AGENT")
+    r = await call(session, "browse_now_showing", query="AGENT")
     check("title search is case-insensitive", r.ok and any(m["title"] == "Agent 404" for m in r.data) and all("agent" in m["title"].lower() for m in r.data))
     genre = movies[0]["genres"][0]
-    r = await call(session, "search_movies", genre=genre.upper())
+    r = await call(session, "browse_now_showing", genre=genre.upper())
     check(f"genre filter '{genre}' works (case-insensitive)", r.ok and r.data and all(genre.lower() in [g.lower() for g in m["genres"]] for m in r.data))
-    r = await call(session, "search_movies", query="zzzz-no-such-movie")
+    r = await call(session, "browse_now_showing", language="ENGLISH")
+    check("language filter works (case-insensitive)", r.ok and r.data and all(m["language"].lower() == "english" for m in r.data), r.error or "")
+    r = await call(session, "browse_now_showing", query="zzzz-no-such-movie")
     check("no match returns an empty list, not an error", r.ok and r.data == [])
     return movies
 
 
+async def test_discover_and_activate(session, movies):
+    section("3. find_any_movie -> add_movie_to_lineup (booking a title that isn't currently listed)")
+    active_ids = {m["movie_id"] for m in movies}
+    r = await call(session, "find_any_movie", title="The Godfather")
+    check("finds a well-known movie that predates any current release window", r.ok and len(r.data) >= 1, r.error or "")
+    if not r.ok or not r.data:
+        return None
+    candidates = r.data
+    check("each result has what's needed to confirm + activate it", all({"tmdb_id", "title", "year", "language"} <= set(c) for c in candidates))
+    pick = next((c for c in candidates if c["title"] == "The Godfather"), candidates[0])
+    check("the classic isn't already sitting in the current line-up", pick["tmdb_id"] not in {m.get("tmdb_id") for m in movies} | set())
+
+    added = await call(session, "add_movie_to_lineup", tmdb_id=pick["tmdb_id"])
+    check("adds it with showtimes ready to book", added.ok and added.data["showtimes"], added.error or "")
+    if not added.ok:
+        return None
+    check("it's brand new this call (not already in the lineup)", added.data["was_already_in_lineup"] is False)
+    new_movie_id = added.data["movie_id"]
+
+    again = await call(session, "add_movie_to_lineup", tmdb_id=pick["tmdb_id"])
+    check("activating the same movie again is idempotent (same id, flagged already-listed)",
+          again.ok and again.data["movie_id"] == new_movie_id and again.data["was_already_in_lineup"] is True, again.error or "")
+
+    listing = await call(session, "browse_now_showing")
+    check("it now shows up in browse_now_showing, in sync with the site", listing.ok and any(m["movie_id"] == new_movie_id for m in listing.data), listing.error or "")
+
+    shows = await call(session, "get_showtimes", movie_id=new_movie_id)
+    check("get_showtimes finds real, bookable showtimes for it", shows.ok and len(shows.data) > 0, shows.error or "")
+    return new_movie_id, shows.data[0] if shows.ok and shows.data else None
+
+
+async def test_book_discovered_movie(session, show_id):
+    section("3b. Full booking cycle on a movie that was NOT in the original line-up")
+    m, free = await free_seats(session, show_id)
+    seat = free[0]
+    b = await call(session, "create_booking", show_id=show_id, seats=[seat], email="found-it@example.com", phone="9876543210")
+    check("a movie brought in via add_movie_to_lineup can be booked like any other", b.ok, b.error or "")
+    if not b.ok:
+        return
+    active_codes.add(b.data["booking_code"])
+    p = await call(session, "confirm_payment", booking_code=b.data["booking_code"])
+    check("...and paid for", p.ok and p.data["status"] == "CONFIRMED", p.error or "")
+    c = await call(session, "cancel_booking", booking_code=b.data["booking_code"])
+    check("...and cancelled, same as any other booking", c.ok, c.error or "")
+    active_codes.discard(b.data["booking_code"])
+
+
 async def test_showtimes(session):
-    section("3. get_showtimes")
+    section("4. get_showtimes")
     r = await call(session, "get_showtimes", movie_id=1)
     check("returns upcoming shows for Agent 404", r.ok and len(r.data) > 0, r.error or "")
     shows = r.data
@@ -180,7 +230,7 @@ async def test_showtimes(session):
 
 
 async def test_seats(session, show):
-    section("4. suggest_seats and get_seat_map")
+    section("5. suggest_seats and get_seat_map")
     sid = show["show_id"]
     m = (await call(session, "get_seat_map", show_id=sid)).data
     need = {"show_id", "movie", "theatre", "date", "time", "price_by_tier_inr", "seats_available", "free_seats_by_row", "aisle_after_seat_number"}
@@ -212,7 +262,7 @@ async def test_seats(session, show):
 
 
 async def test_booking_lifecycle(session, show):
-    section("5. create_booking (validation, holds, conflicts)")
+    section("6. create_booking (validation, holds, conflicts)")
     sid = show["show_id"]
     email = "MCP.Tester@Example.com"
     m, free = await free_seats(session, sid)
@@ -267,7 +317,7 @@ async def test_booking_lifecycle(session, show):
 
 
 async def test_payment(session, b, b_extra, sid):
-    section("6. confirm_payment")
+    section("7. confirm_payment")
     code = b["booking_code"]
     p = await call(session, "confirm_payment", booking_code=code)
     check("wallet payment confirms the booking", p.ok and p.data["status"] == "CONFIRMED", p.error or "")
@@ -292,7 +342,7 @@ async def test_payment(session, b, b_extra, sid):
 
 
 async def test_lookup(session, email, created):
-    section("7. get_booking and list_bookings")
+    section("8. get_booking and list_bookings")
     r = await call(session, "get_booking", booking_code=created[0])
     need = {"booking_code", "status", "movie", "theatre", "screen", "date", "time", "seats", "total_amount_inr", "email", "phone"}
     check("get_booking returns every field", r.ok and need <= set(r.data), r.error or "")
@@ -308,7 +358,7 @@ async def test_lookup(session, email, created):
 
 
 async def test_cancel(session, confirmed_code, sid):
-    section("8. cancel_booking")
+    section("9. cancel_booking")
     m_before, _ = await free_seats(session, sid)
     seats = (await call(session, "get_booking", booking_code=confirmed_code)).data["seats"]
     total = (await call(session, "get_booking", booking_code=confirmed_code)).data["total_amount_inr"]
@@ -325,7 +375,7 @@ async def test_cancel(session, confirmed_code, sid):
 
 
 async def test_pending_cancel_and_tiers(session, sid, tiers):
-    section("9. Tier pricing and cancelling an unpaid hold")
+    section("10. Tier pricing and cancelling an unpaid hold")
     m, free = await free_seats(session, sid)
     pick = [next(s for s in free if s[0] in t["rows"]) for t in tiers.values()]  # one seat in each tier
     r = await call(session, "create_booking", show_id=sid, seats=pick, email="tiers@example.com", phone="9876543210")
@@ -339,7 +389,7 @@ async def test_pending_cancel_and_tiers(session, sid, tiers):
 
 
 async def test_live_events(session, sid):
-    section("10. The agent's actions produce live events for the website")
+    section("11. The agent's actions produce live events for the website")
     start = http_json(API, "/api/events/poll")["last"]
     _, free = await free_seats(session, sid)
     seat = free[len(free) // 2]
@@ -353,7 +403,7 @@ async def test_live_events(session, sid):
 
 
 async def test_expiry():
-    section("11. An unpaid hold expires")
+    section("12. An unpaid hold expires")
     if not EXPIRY_API:
         print("  ⏭  skipped (set EXPIRY_API_URL to a backend started with HOLD_MINUTES=0.05)")
         return
@@ -373,17 +423,17 @@ async def test_expiry():
 
 
 async def test_backend_down():
-    section("12. Backend unreachable")
+    section("13. Backend unreachable")
     async with stdio_client(stdio_params("http://127.0.0.1:9")) as (r, w):
         async with ClientSession(r, w) as s:
             await s.initialize()
-            res = await call(s, "search_movies")
+            res = await call(s, "browse_now_showing")
             check("agent gets a readable error, not a crash", not res.ok and "could not reach" in res.error.lower(), res.error or "")
             check("the server is still alive afterwards", len((await s.list_tools()).tools) == len(EXPECTED_TOOLS))
 
 
 async def test_http_transport():
-    section("13. Same server over streamable HTTP (remote MCP)")
+    section("14. Same server over streamable HTTP (remote MCP)")
     port = 8011
     proc = subprocess.Popen([sys.executable, SERVER, "--transport", "http", "--port", str(port)],
                             env={**os.environ, "TICKETTOWN_API_URL": API}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -395,7 +445,7 @@ async def test_http_transport():
                         await s.initialize()
                         tools = {t.name for t in (await s.list_tools()).tools}
                         check("all 9 tools are listed over HTTP", tools == set(EXPECTED_TOOLS), str(tools))
-                        movies = await call(s, "search_movies", query="agent")
+                        movies = await call(s, "browse_now_showing", query="agent")
                         check("search works over HTTP", movies.ok and movies.data and movies.data[0]["title"] == "Agent 404")
                         shows = (await call(s, "get_showtimes", movie_id=1, date="tomorrow")).data
                         seats = (await call(s, "suggest_seats", show_id=shows[-1]["show_id"], count=1)).data["seats"]
@@ -423,7 +473,8 @@ async def main():
         async with ClientSession(r, w) as session:
             init = await session.initialize()
             await test_discovery(session, init)
-            await test_search(session)
+            movies = await test_browse(session)
+            discovered = await test_discover_and_activate(session, movies)
             tomorrow = await test_showtimes(session)
             show = next((s for s in tomorrow if s["seats_available"] >= 40), tomorrow[0])
             await test_seats(session, show)
@@ -435,6 +486,8 @@ async def main():
             await test_cancel(session, b["booking_code"], sid)
             await test_pending_cancel_and_tiers(session, sid, tiers)
             await test_live_events(session, sid)
+            if discovered and discovered[1]:
+                await test_book_discovered_movie(session, discovered[1]["show_id"])
             # tidy up anything we left behind
             for code in list(active_codes):
                 await call(session, "cancel_booking", booking_code=code)

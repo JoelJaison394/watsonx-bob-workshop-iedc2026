@@ -4,9 +4,11 @@ TicketTown is a movie ticket booking web app — a website, its backend server, 
 
 ## Try it yourself
 
-The easiest way to see it running, with nothing to install:
+**Just want to click around?** → **[tickettown.netlify.app](https://tickettown.netlify.app)** — browse movies, pick seats, book a ticket, watch the live activity feed.
 
-1. Open **[stackblitz.com/edit/web-platform](https://stackblitz.com/edit/web-platform)** — a free, blank HTML/CSS/JS project in your browser.
+**Want to see and edit the code, right in your browser?**
+
+1. Open **[stackblitz.com/edit/web-platform](https://stackblitz.com/edit/web-platform)** — a free, blank HTML/CSS/JS project.
 2. In this repo, open the frontend code: **[`frontend/index.html`](frontend/index.html)**.
 3. Copy its contents and paste them over StackBlitz's `index.html`, replacing everything in that file.
 4. It runs immediately — it already points at a live, working backend, so you can browse movies, pick seats, and book a ticket right away.
@@ -45,7 +47,7 @@ Rules:
 8. If a tool returns an error, explain it in plain words and offer an alternative.
 ```
 
-Once that's set up, try asking your agent things like *"what's showing today?"*, *"book me 2 seats for tonight"*, or *"can I get tickets for a movie that isn't listed?"* — and watch the seat you book disappear live on the website you opened in StackBlitz.
+Once that's set up, try asking your agent things like *"what's showing today?"*, *"book me 2 seats for tonight"*, or *"can I get tickets for a movie that isn't listed?"* — and watch the seat you book disappear live on **[tickettown.netlify.app](https://tickettown.netlify.app)** (or the StackBlitz copy).
 
 ## Want to go deeper?
 

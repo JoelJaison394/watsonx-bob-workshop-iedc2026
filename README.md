@@ -8,5 +8,3 @@ A collection of demo projects built for IBM watsonx / MCP workshops.
 | **PythonToolProject/** | *Reserved.* | 🚧 Coming soon |
 | [**OpenAPIToolProject/**](OpenAPIToolProject/README.md) | A guided project: build a weather assistant in watsonx Orchestrate using an **OpenAPI tool** (no server to write) instead of MCP - the other way Orchestrate can call an external API. | ✅ Ready to build |
 | [**MCPToolProject/**](MCPToolProject/README.md) | A guided project: connect an agent in watsonx Orchestrate to an existing third-party MCP server (DeepWiki) so it can answer questions about any public GitHub repository. | ✅ Ready to build |
-
-Each project lives in its own folder with its own README and is self-contained — its own dependencies, its own setup, its own docs.

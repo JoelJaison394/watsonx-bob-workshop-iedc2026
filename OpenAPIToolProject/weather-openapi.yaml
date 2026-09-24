@@ -1,0 +1,150 @@
+openapi: 3.0.3
+info:
+  title: Open-Meteo Weather Forecast
+  description: >
+    Free weather forecasts for any place on Earth. No API key required.
+    This spec covers one endpoint - current weather conditions - kept
+    deliberately small so it's easy to read start to finish. Open-Meteo
+    doesn't publish its own OpenAPI/Swagger file, so this one is
+    hand-written from https://open-meteo.com/en/docs and the real API
+    response, for importing into watsonx Orchestrate as an OpenAPI tool.
+  version: "1.0.0"
+  contact:
+    name: Open-Meteo (this spec is unofficial)
+    url: https://open-meteo.com
+externalDocs:
+  description: Full Open-Meteo API docs (many more variables than this spec covers)
+  url: https://open-meteo.com/en/docs
+
+servers:
+  - url: https://api.open-meteo.com/v1
+    description: Open-Meteo production API
+
+paths:
+  /forecast:
+    get:
+      operationId: getCurrentWeather
+      summary: Get the current weather for a location
+      description: >
+        Returns live weather conditions (temperature, wind, whether it's
+        currently raining, etc.) for the given latitude/longitude. No
+        signup and no API key needed.
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          description: Latitude in decimal degrees, e.g. 12.97 for Bengaluru.
+          schema:
+            type: number
+            format: float
+            minimum: -90
+            maximum: 90
+          example: 12.97
+        - name: longitude
+          in: query
+          required: true
+          description: Longitude in decimal degrees, e.g. 77.59 for Bengaluru.
+          schema:
+            type: number
+            format: float
+            minimum: -180
+            maximum: 180
+          example: 77.59
+        - name: current_weather
+          in: query
+          required: true
+          description: Must be true to get the current-conditions block this spec describes.
+          schema:
+            type: boolean
+            default: true
+        - name: timezone
+          in: query
+          required: false
+          description: >
+            IANA timezone (e.g. "Asia/Kolkata") so the returned time is
+            local instead of GMT. "auto" detects it from the coordinates.
+          schema:
+            type: string
+            default: auto
+          example: auto
+      responses:
+        "200":
+          description: Current weather for the requested location.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ForecastResponse"
+              example:
+                latitude: 12.970123
+                longitude: 77.56364
+                timezone: "Asia/Kolkata"
+                timezone_abbreviation: "GMT+5:30"
+                elevation: 914.0
+                current_weather:
+                  time: "2026-09-24T07:30"
+                  temperature: 20.7
+                  windspeed: 14.8
+                  winddirection: 252
+                  is_day: 1
+                  weathercode: 3
+        "400":
+          description: A required parameter was missing or out of range.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+
+components:
+  schemas:
+    ForecastResponse:
+      type: object
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        timezone:
+          type: string
+          description: The resolved IANA timezone name.
+        timezone_abbreviation:
+          type: string
+        elevation:
+          type: number
+          description: Metres above sea level.
+        current_weather:
+          $ref: "#/components/schemas/CurrentWeather"
+      required: [latitude, longitude, current_weather]
+    CurrentWeather:
+      type: object
+      properties:
+        time:
+          type: string
+          description: Local time this reading was taken (ISO 8601, no timezone offset).
+        temperature:
+          type: number
+          description: Degrees Celsius.
+        windspeed:
+          type: number
+          description: Kilometres per hour.
+        winddirection:
+          type: number
+          description: Degrees, 0 = north.
+        is_day:
+          type: integer
+          enum: [0, 1]
+          description: 1 if it's currently daytime at that location, else 0.
+        weathercode:
+          type: integer
+          description: >
+            WMO weather code - 0 clear sky, 1-3 mainly clear to overcast,
+            45/48 fog, 51-67 drizzle/rain, 71-86 snow, 95-99 thunderstorm.
+            Full table: https://open-meteo.com/en/docs#weathervariables
+      required: [time, temperature, windspeed, winddirection, weathercode]
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: boolean
+        reason:
+          type: string
+      required: [error, reason]

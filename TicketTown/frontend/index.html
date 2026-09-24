@@ -429,7 +429,7 @@ footer a { color: #fff; text-decoration: underline; }
    3) Flip SHOW_AGENT_HINT to true once the Orchestrate chat is embedded.
    (Movie posters come from TMDB via the backend. No TMDB key belongs here.) */
 const TICKETTOWN_API_URL = 'https://workshop-backend.apps.wo-dp-005.p75g.p1.openshiftapps.com';
-const SHOW_AGENT_HINT = false;
+const SHOW_AGENT_HINT = true;
 const MAX_SEATS = 6;
 
 /* ───────────────────────────── logo ───────────────────────────── */
@@ -1569,6 +1569,124 @@ route();
      window.wxOConfiguration and loads wxoLoader.js). The chat launcher appears
      bottom-right. Then set SHOW_AGENT_HINT = true near the top of this file.
      ═══════════════════════════════════════════════════════════════════════════════ -->
+<script>
+  window.wxOConfiguration = {
+    orchestrationID: "20260918-0713-1067-0033-18cc8e65cf29_20260922-0646-5079-901f-d356e43762b8",
+    hostURL: "https://dl.watson-orchestrate.ibm.com",
+    rootElementID: "root",
+    chatOptions: {
+      agentId: "a5473ed0-cf0d-4ef2-9021-d74249258d4c",
+      onLoad: function (instance) {
+        window.wxoChatInstance = instance;
+
+        instance.updateWelcomeScreen({
+          welcomeMessage: 'Hey! I\'m TickyBot 🎬',
+          description: 'Your TicketTown movie concierge. Search showtimes, check seats, or book tickets instantly.',
+          starterPrompts: [
+            {
+              id: 'book-seats',
+              title: 'Book tickets for a movie',
+              subtitle: 'Select showtimes and seats',
+              prompt: 'Book 2 seats for Agent 404 tomorrow morning',
+            },
+            {
+              id: 'find-movies',
+              title: 'What movies are showing?',
+              subtitle: 'Check movies in cinemas today',
+              prompt: 'What movies are playing today?',
+            },
+            {
+              id: 'my-bookings',
+              title: 'Find my booking',
+              subtitle: 'Look up tickets and status',
+              prompt: 'Can you check my booking status?',
+            },
+            {
+              id: 'cancel-booking',
+              title: 'Cancel or refund',
+              subtitle: 'Release held seats',
+              prompt: 'I want to cancel my movie booking',
+            },
+          ],
+        });
+
+        function writeSlot(name, html) {
+          try {
+            var host = instance.getWriteableElement(name);
+            if (host) host.innerHTML = html;
+          } catch (error) {
+            /* Slot not available in this build — safely ignore */
+          }
+        }
+
+        writeSlot(
+          'belowHeader',
+          '<div style="display:flex;gap:.5rem;align-items:center;padding:.45rem .85rem;' +
+            'background:#fde8ec;border-bottom:1px solid #f7c9d1;color:#dc2a4b;' +
+            'font-size:.78rem;line-height:1.35;font-weight:500">' +
+            '<span aria-hidden="true">🍿</span>' +
+            '<span>Live seat bookings sync instantly across TicketTown!</span>' +
+            '</div>'
+        );
+
+        writeSlot(
+          'belowWelcomeStarters',
+          '<div style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.25rem .25rem .5rem">' +
+            ['Agent 404', 'Inception', 'IMAX Shows', 'Today\'s Schedule']
+              .map(function (label) {
+                return (
+                  '<span style="border:1px solid #e4e4e9;border-radius:999px;' +
+                  'padding:.25rem .7rem;font-size:.75rem;color:#6b7080;background:#ffffff;cursor:default">' +
+                  label +
+                  '</span>'
+                );
+              })
+              .join('') +
+            '</div>'
+        );
+
+        writeSlot(
+          'aboveInputBar',
+          '<div style="padding:.35rem .85rem .5rem;color:#6b7080;font-size:.7rem;line-height:1.35">' +
+            'TicketTown Assistant · Seats are held for 10 minutes upon booking.' +
+            '</div>'
+        );
+      },
+    },
+    layout: {
+      form: 'float',
+      width: '24rem',
+      height: '38rem',
+    },
+    features: {
+      showThreadList: true,
+    },
+    style: {
+      theme: 'light',
+      showBackgroundGradient: true,
+      headerColor: '#1f2533',
+      primaryColor: '#f84464',
+      userMessageBackgroundColor: '#fde8ec',
+      borderRadius: 8,
+      fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    },
+    header: {
+      showResetButton: true,
+      showAiDisclaimer: false,
+      showMaximize: true,
+      showAgentAvatar: true,
+      showAgentName: true,
+    }
+  };
+  setTimeout(function () {
+    const script = document.createElement('script');
+    script.src = `${window.wxOConfiguration.hostURL}/wxochat/wxoLoader.js?embed=true`;
+    script.addEventListener('load', function () {
+        wxoLoader.init();
+    });
+    document.head.appendChild(script);
+  }, 0);
+</script>
 
 </body>
 </html>

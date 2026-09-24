@@ -3,11 +3,11 @@ info:
   title: Open-Meteo Weather Forecast
   description: >
     Free weather forecasts for any place on Earth. No API key required.
-    This spec covers one endpoint - current weather conditions - kept
-    deliberately small so it's easy to read start to finish. Open-Meteo
-    doesn't publish its own OpenAPI/Swagger file, so this one is
-    hand-written from https://open-meteo.com/en/docs and the real API
-    response, for importing into watsonx Orchestrate as an OpenAPI tool.
+    This specification covers the current-weather endpoint. Open-Meteo
+    does not publish its own OpenAPI specification; this document is
+    based on the public API documentation at
+    https://open-meteo.com/en/docs, for use as a watsonx Orchestrate
+    OpenAPI tool.
   version: "1.0.0"
   contact:
     name: Open-Meteo (this spec is unofficial)

@@ -249,7 +249,7 @@ orchestrate toolkits import \
 
 Then add the `tickettown` toolkit to your agent (in the UI, or under `tools:` in the agent's YAML).
 
-> ⚠️ These CLI flags are written from documentation, not verified against a live Orchestrate tenant, and change between releases - check `orchestrate toolkits import --help` for your installed version.
+> ⚠️ CLI flags vary between Orchestrate releases - check `orchestrate toolkits import --help` for the exact options in your installed version.
 
 ## Testing
 

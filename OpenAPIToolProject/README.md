@@ -1,14 +1,14 @@
 # OpenAPI Tool Project — Weather Assistant
 
-A guided project: build an AI agent in **watsonx Orchestrate** that can answer weather questions, using an **OpenAPI tool** instead of MCP. This is the other way Orchestrate can call an external API — no server to write, just a spec to import.
+A guided project: build an AI agent in **watsonx Orchestrate** that answers weather questions using an **OpenAPI tool**, instead of MCP. An OpenAPI tool lets Orchestrate call an external API directly from its specification, with no server to write.
 
-**Compare this to [`../TicketTown`](../TicketTown):** TicketTown needed a whole Python MCP server, because *we* built and control that backend. Here, someone else already runs the weather API — Orchestrate can call it directly once it knows the API's shape, which is exactly what an OpenAPI spec describes.
+**Compared to [`../TicketTown`](../TicketTown):** TicketTown required a custom MCP server because it exposes a purpose-built backend. Here, the API already exists and is public, so Orchestrate can call it directly once given its OpenAPI specification.
 
 ## The API: Open-Meteo
 
-[Open-Meteo](https://open-meteo.com) — free, real-time weather for any location on Earth, **no API key, no signup**. Chosen deliberately for a first OpenAPI-tool project: nothing to register for, nothing that can expire mid-workshop, one clean endpoint to start with.
+[Open-Meteo](https://open-meteo.com) provides free, real-time weather data for any location worldwide. No API key or signup is required.
 
-Try it right now in a terminal or browser — this is the exact request the tool will make:
+Example request — this is the exact call the tool makes:
 
 ```bash
 curl "https://api.open-meteo.com/v1/forecast?latitude=12.97&longitude=77.59&current_weather=true&timezone=auto"
@@ -26,20 +26,20 @@ curl "https://api.open-meteo.com/v1/forecast?latitude=12.97&longitude=77.59&curr
 }
 ```
 
-`latitude`/`longitude` locate the place; `weathercode` is a [WMO code](https://open-meteo.com/en/docs#weathervariables) (0 = clear sky, 61-67 = rain, 95-99 = thunderstorm, etc.).
+`latitude`/`longitude` locate the place; `weathercode` is a [WMO code](https://open-meteo.com/en/docs#weathervariables) (0 = clear sky, 61–67 = rain, 95–99 = thunderstorm, etc.).
 
 ## The spec: [`weather-openapi.yaml`](weather-openapi.yaml)
 
-**Open-Meteo doesn't publish its own OpenAPI/Swagger file** (checked their site, their GitHub, and the usual `/openapi.json` paths — nothing). That's common for smaller or community APIs, and it's a useful thing to know: **an OpenAPI tool doesn't require the API owner to have written a spec.** Anyone can write one that accurately describes an existing API, and that's what this file is — hand-written from Open-Meteo's docs and its real response, covering just the one endpoint above, kept small on purpose for a first project.
+Open-Meteo does not publish its own OpenAPI specification. This file describes the current-weather endpoint above, based on the public API documentation, and is a valid OpenAPI 3.0.3 document.
 
-It's a real, validated OpenAPI 3.0.3 document — checked with `openapi-spec-validator`, and every field it declares was cross-checked against a live response from the API.
+An OpenAPI tool does not require the API provider to supply the specification — any accurate description of an existing API can be used.
 
 ## Build it: import into watsonx Orchestrate
 
 1. In Orchestrate, choose to add a tool from an **OpenAPI specification**.
 2. Upload [`weather-openapi.yaml`](weather-openapi.yaml) (or paste its contents).
 3. Orchestrate reads the spec and creates a tool from the `getCurrentWeather` operation, using the parameter descriptions in the file.
-4. No authentication needed — Open-Meteo's endpoint is public.
+4. No authentication is required — Open-Meteo's endpoint is public.
 5. Attach the new tool to an agent.
 
 *(Exact menu names vary by Orchestrate version — look for "Add tool" or "Import" and an OpenAPI/Swagger option.)*
@@ -61,10 +61,10 @@ Rules:
 4. If the tool call fails, say so plainly and ask the customer to try again shortly.
 ```
 
-Try asking it things like *"what's the weather in Bengaluru right now?"* or *"is it raining in Kochi?"*
+Example questions: *"what's the weather in Bengaluru right now?"*, *"is it raining in Kochi?"*
 
 ## Stretch goals
 
 - Add the `hourly` or `daily` parameters (see [Open-Meteo's docs](https://open-meteo.com/en/docs)) and extend the spec to cover a forecast, not just current conditions.
-- Add a second operation for a different Open-Meteo endpoint (e.g. their [geocoding API](https://open-meteo.com/en/docs/geocoding-api), also free and keyless) so the agent can resolve a city name to coordinates itself, instead of guessing.
-- Combine it with TicketTown: an agent that checks the weather before suggesting an outdoor vs. indoor plan, or simply mentions "it'll be raining, perfect night for a movie" alongside a booking.
+- Add a second operation for a different Open-Meteo endpoint (e.g. its [geocoding API](https://open-meteo.com/en/docs/geocoding-api), also free and keyless) so the agent can resolve a city name to coordinates itself.
+- Combine it with TicketTown: an agent that checks the weather before suggesting an outdoor or indoor plan, or mentions the forecast alongside a booking.

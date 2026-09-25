@@ -78,6 +78,6 @@ Example questions: *"What does the facebook/react repository do?"*, *"How does a
 
 ## Stretch goals
 
-- Point the agent at [`this repository`](../..) and ask it to explain how TicketTown's MCP server works, as a comparison between the two approaches.
+- Point the agent at [`this repository`](https://github.com/JoelJaison394/watsonx-bob-workshop-iedc2026/blob/main/TicketTown/README.md) and ask it to explain how TicketTown's MCP server works, as a comparison between the two approaches.
 - Add a second remote MCP server and give the agent both, so it can choose which one answers a given question.
 - Look at how DeepWiki's own tool descriptions are written (returned when the server is first connected) and compare that style to the descriptions used in [`../TicketTown/mcp/server.py`](../TicketTown/mcp/server.py).

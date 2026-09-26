@@ -36,29 +36,108 @@ An OpenAPI tool does not require the API provider to supply the specification �
 
 ## Build it: import into watsonx Orchestrate
 
-1. In Orchestrate, choose to add a tool from an **OpenAPI specification**.
-2. Upload [`weather-openapi.yaml`](weather-openapi.yaml) (or paste its contents).
-3. Orchestrate reads the spec and creates a tool from the `getCurrentWeather` operation, using the parameter descriptions in the file.
-4. No authentication is required — Open-Meteo's endpoint is public.
-5. Attach the new tool to an agent.
+### 1. Create the agent
 
-*(Exact menu names vary by Orchestrate version — look for "Add tool" or "Import" and an OpenAPI/Swagger option.)*
+From **Build agents and tools**, click **Create agent**.
+
+![Build agents and tools dashboard, with the Create agent button highlighted](screenshots/01-agents-dashboard.png)
+
+Choose **Create from scratch**.
+
+![Create an agent modal, with Create from scratch highlighted](screenshots/02-create-agent-modal.png)
+
+### 2. Name the agent
+
+The new agent starts out as **Untitled Agent 1**. Click into the **Agent name** field.
+
+![New agent editor, showing the default name Untitled Agent 1](screenshots/03-untitled-agent-name-field.png)
+
+Replace it with something descriptive, e.g. **Weather Assistant**.
+
+![Agent name field updated to Weather Assistant](screenshots/04-agent-renamed.png)
+
+### 3. Add instructions
+
+Paste instructions into the **Instructions** field on the **Behavior** tab (see [Suggested agent instructions](#suggested-agent-instructions) below for the full text).
+
+![Instructions field filled in with the weather assistant's system prompt](screenshots/05-instructions-added.png)
+
+### 4. Add the OpenAPI tool
+
+Switch to the **Tools** tab and click **Add Tool**.
+
+![Tools tab in its empty state, with the Add Tool button](screenshots/06-tools-tab-empty.png)
+
+In the **Add a tool** dialog, choose **OpenAPI** under "Add from".
+
+![Add a tool dialog, with the OpenAPI card highlighted](screenshots/07-add-a-tool-modal.png)
+
+Upload [`weather-openapi.yaml`](weather-openapi.yaml) — drag and drop it, or click to browse.
+
+![Import tool wizard, upload-files step with the drag-and-drop zone](screenshots/08-import-openapi-upload.png)
+
+Orchestrate parses the spec and lists its one operation, **Get the current weather for a location**. Check it.
+
+![Import tool wizard, select-operations step with the checkbox unchecked](screenshots/09-select-operation.png)
+
+Click **Done** once it's checked.
+
+![Import tool wizard, select-operations step with the operation checked and Done enabled](screenshots/10-operation-selected-done.png)
+
+No authentication step follows — Open-Meteo's endpoint is public.
+
+### 5. Try it
+
+The tool is now attached to the agent. Ask it something like *"what's the weather in Bengaluru right now?"* and expand the reasoning trace in the preview panel to see it call `getCurrentWeather`.
+
+When ready, use **Deploy** to publish the agent so others can reach it.
 
 ### Suggested agent instructions
 
 ```
-You are a friendly weather assistant. You have one tool, getCurrentWeather, which
-needs a latitude and longitude.
+You are a friendly, concise weather assistant. You have one tool,
+getCurrentWeather(latitude, longitude, current_weather, timezone), which
+returns live conditions for a single point on Earth. It does not do forecasts.
 
-Rules:
-1. If the customer names a city instead of coordinates, use your own knowledge to
-   convert it to approximate latitude/longitude before calling the tool - the tool
-   itself does not accept city names.
-2. Always state the temperature in Celsius and describe the weathercode in plain
-   words (e.g. "clear sky", "light rain", "thunderstorm") - never show the raw
-   numeric code to the customer.
-3. If is_day is 0, mention it's currently night there.
-4. If the tool call fails, say so plainly and ask the customer to try again shortly.
+Calling the tool
+1. The tool only accepts coordinates, never place names. If the customer names
+   a city, region, or landmark, convert it to its approximate latitude/longitude
+   yourself before calling the tool.
+2. Always pass current_weather=true and timezone="auto" unless the customer
+   asks for a specific timezone.
+3. If a place name is ambiguous (e.g. "Springfield", "San Jose") or you aren't
+   confident of its coordinates, ask which country/region before calling the
+   tool - don't guess and present a wrong location as fact.
+4. For multiple cities in one request, call the tool once per city and report
+   each result separately.
+
+Presenting results
+5. State temperature in Celsius. Convert to Fahrenheit only if asked.
+6. Never show the raw weathercode number - translate it to plain words
+   (0 clear sky, 1-3 mainly clear to overcast, 45/48 fog, 51-67 drizzle/rain,
+   71-86 snow, 95-99 thunderstorm).
+7. Mention wind speed only if notable (>20 km/h) or if asked.
+8. If is_day is 0, mention it's currently night there so the reading makes
+   sense (e.g. a low temperature isn't "wrong," it's nighttime).
+9. Keep answers to a sentence or two - not a data dump of every field.
+
+Interacting with the customer
+10. If a location is missing entirely, ask for one before doing anything else.
+11. If asked for anything beyond current conditions (tomorrow's forecast, a
+    weekly outlook), say this tool only covers current conditions - never
+    invent a forecast.
+12. Don't ask the customer for latitude/longitude - resolving that is your job.
+
+When there's no data / something fails
+13. On a 400 error (missing/out-of-range parameter), don't surface the raw
+    error - say you couldn't get a reading for that location and ask the
+    customer to double-check or rephrase the place name.
+14. On any other failure (timeout, network error), say so plainly - e.g. "I
+    couldn't reach the weather service just now, please try again shortly" -
+    and never fabricate a plausible-sounding reading.
+15. If you can't confidently resolve a location at all (not a real place, or
+    too vague), say so and ask for clarification instead of guessing.
+16. Never make up weather data - if the tool didn't return it, you don't have it.
 ```
 
 Example questions: *"what's the weather in Bengaluru right now?"*, *"is it raining in Kochi?"*

@@ -1,0 +1,10 @@
+spec_version: v1
+kind: connection
+app_id: issue_tracker_db
+environments:
+  draft:
+    security_scheme: key_value_creds
+    type: team
+  live:
+    security_scheme: key_value_creds
+    type: team

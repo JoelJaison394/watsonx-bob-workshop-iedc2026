@@ -1,3 +1,7 @@
+# Instance URL
+https://ap-southeast-1.dl.watson-orchestrate.ibm.com
+
+
 # Demo Project
 
 A collection of demo projects built for IBM watsonx / MCP workshops.

@@ -8,9 +8,9 @@ TicketTown is a movie ticket booking web app — a website, its backend server, 
 
 **Want to see and edit the code, right in your browser?**
 
-1. Open **[stackblitz.com/edit/web-platform](https://stackblitz.com/edit/web-platform)** — a free, blank HTML/CSS/JS project.
+1. Open **[stackblitz.com/edit/web-platform](https://stackblitz.com/edit/web-platform)** or **[codepen.io/pen](https://codepen.io/pen)** — either one gives you a free, blank HTML/CSS/JS project.
 2. In this repo, open the frontend code: **[`frontend/index.html`](frontend/index.html)**.
-3. Copy its contents and paste them over StackBlitz's `index.html`, replacing everything in that file.
+3. Copy its contents and paste them over the `index.html` (StackBlitz) or the HTML panel (CodePen), replacing everything in that file.
 4. It runs immediately — it already points at a live, working backend, so you can browse movies, pick seats, and book a ticket right away.
 
 That's the whole app in one file: no build step, no install.

@@ -49,6 +49,28 @@ Rules:
 
 Once that's set up, try asking your agent things like *"what's showing today?"*, *"book me 2 seats for tonight"*, or *"can I get tickets for a movie that isn't listed?"* — and watch the seat you book disappear live on **[tickettown.netlify.app](https://tickettown.netlify.app)** (or the StackBlitz copy).
 
+## Prompts
+
+Two ready-to-paste test prompts for TickyBot:
+
+**Prompt 1 — the realistic scenario:**
+
+```
+Hey, I'm in Kochi visiting a friend, but he just messaged that he's running about 3 hours late — it's 12:30 PM now, so he won't get here till 3:30 PM. Can you find me a good action-thriller playing right now that I could watch on my own and still be done by the time he gets here?
+```
+
+**Prompt 2 — locking it in:**
+
+```
+Let's go with <movie name> — I don't mind which theatre, whichever's easier. Grab me the most comfortable seat you've got. My email is arjun.k@example.com and phone is 9846012345, and go ahead and pay with UPI — the id is arjun.k@oksbi.
+```
+
+**Prompt 3 — checking your bookings:**
+
+```
+Hi, can you check what bookings I have? My email is arjun.k@example.com.
+```
+
 ## Want to go deeper?
 
 For the architecture, the folder structure, running everything on your own machine, deploying your own copy, and the test suite — see **[DOCS.md](DOCS.md)**.
